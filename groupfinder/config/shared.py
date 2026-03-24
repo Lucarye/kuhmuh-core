@@ -1,0 +1,12 @@
+from __future__ import annotations
+
+GROUPFINDER_MODULE_KEY = "groupfinder"
+
+DEFAULT_SESSION_MINUTES = 15
+DEFAULT_INTERACTION_GUARD_SECONDS = 3
+
+LIVE_CONTEXT_KEY = "LIVE"
+TEST_CONTEXT_KEY = "TEST"
+
+LIVE_STORAGE_NAMESPACE = "groupfinder_live"
+TEST_STORAGE_NAMESPACE = "groupfinder_test"
