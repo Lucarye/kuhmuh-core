@@ -36,6 +36,19 @@ class PublicSearchView(discord.ui.View):
         self._search_renderer = search_renderer
         self._embed_builder = embed_builder
 
+    def apply_search_state(self, search: Search) -> None:
+        """
+        Passt die Button-Zustände an den aktuellen Search-Status an.
+        """
+        is_open = search.is_open()
+
+        self.join_button.disabled = not is_open
+        self.leave_button.disabled = not is_open
+        self.close_button.disabled = not is_open
+
+        self.open_button.disabled = is_open
+        self.delete_button.disabled = False
+
     @discord.ui.button(label="Beitreten", style=discord.ButtonStyle.success, row=0)
     async def join_button(
         self,
@@ -118,10 +131,17 @@ class PublicSearchView(discord.ui.View):
                 search_id=self._search_id,
                 actor_user_id=confirm_interaction.user.id,
             )
-            await self._finalize_interaction(
-                confirm_interaction,
-                result,
-                public_message_id=public_message_id,
+
+            if result.changed:
+                await self._refresh_public_message(
+                    confirm_interaction,
+                    result.search,
+                    public_message_id=public_message_id,
+                )
+
+            await confirm_interaction.response.edit_message(
+                content=result.user_message or "Suche geschlossen.",
+                view=None,
             )
 
         confirm_view = ConfirmActionView(
@@ -183,25 +203,37 @@ class PublicSearchView(discord.ui.View):
         public_message_id = interaction.message.id if interaction.message else None
 
         async def _confirm_delete(confirm_interaction: discord.Interaction) -> None:
+            await confirm_interaction.response.edit_message(
+                content="Suche wird gelöscht...",
+                view=None,
+            )
+
             result = await self._search_service.delete_search(
                 context=self._context,
                 search_id=self._search_id,
                 actor_user_id=confirm_interaction.user.id,
             )
-            await self._finalize_interaction(
-                confirm_interaction,
-                result,
-                public_message_id=public_message_id,
+
+            if result.changed:
+                await self._refresh_public_message(
+                    confirm_interaction,
+                    result.search,
+                    public_message_id=public_message_id,
+                )
+
+            await confirm_interaction.edit_original_response(
+                content=result.user_message or "Suche wurde gelöscht.",
+                view=None,
             )
 
         confirm_view = ConfirmActionView(
             confirm_callback=_confirm_delete,
-            confirm_label="Löschen bestätigen",
+            confirm_label="Ja, endgültig löschen",
             cancel_label="Abbrechen",
         )
 
         await interaction.response.send_message(
-            "Möchtest du diese Gruppensuche wirklich löschen?",
+            "Möchtest du diese Suche wirklich endgültig löschen?\n⚠️ Dieser Vorgang kann nicht rückgängig gemacht werden.",
             view=confirm_view,
             ephemeral=True,
         )
@@ -214,8 +246,7 @@ class PublicSearchView(discord.ui.View):
         public_message_id: int | None,
     ) -> None:
         """
-        Aktualisiert bei Bedarf die öffentliche Nachricht und nutzt für Rückmeldungen
-        möglichst dieselbe ephemere Nachricht weiter, statt zusätzliche Followups zu erzeugen.
+        Standardabschluss für direkte Aktionen ohne Confirm-Zwischenschritt.
         """
         if result.changed:
             await self._refresh_public_message(
@@ -224,18 +255,10 @@ class PublicSearchView(discord.ui.View):
                 public_message_id=public_message_id,
             )
 
-        message_text = result.user_message or "Aktion abgeschlossen."
-
-        if interaction.response.is_done():
-            await interaction.edit_original_response(
-                content=message_text,
-                view=None,
-            )
-        else:
-            await interaction.response.send_message(
-                message_text,
-                ephemeral=True,
-            )
+        await interaction.response.send_message(
+            result.user_message or "Aktion abgeschlossen.",
+            ephemeral=True,
+        )
 
     async def _refresh_public_message(
         self,
@@ -262,7 +285,17 @@ class PublicSearchView(discord.ui.View):
         render_data = self._search_renderer.render_search(search)
         embed = self._embed_builder(render_data)
 
+        refreshed_view = PublicSearchView(
+            context=self._context,
+            search_id=self._search_id,
+            search_service=self._search_service,
+            search_renderer=self._search_renderer,
+            embed_builder=self._embed_builder,
+            timeout=self.timeout,
+        )
+        refreshed_view.apply_search_state(search)
+
         await public_message.edit(
             embed=embed,
-            view=self,
+            view=refreshed_view,
         )
