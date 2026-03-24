@@ -214,7 +214,8 @@ class PublicSearchView(discord.ui.View):
         public_message_id: int | None,
     ) -> None:
         """
-        Sendet die ephemere Rückmeldung und aktualisiert bei Bedarf die öffentliche Nachricht.
+        Aktualisiert bei Bedarf die öffentliche Nachricht und nutzt für Rückmeldungen
+        möglichst dieselbe ephemere Nachricht weiter, statt zusätzliche Followups zu erzeugen.
         """
         if result.changed:
             await self._refresh_public_message(
@@ -223,14 +224,16 @@ class PublicSearchView(discord.ui.View):
                 public_message_id=public_message_id,
             )
 
+        message_text = result.user_message or "Aktion abgeschlossen."
+
         if interaction.response.is_done():
-            await interaction.followup.send(
-                result.user_message or "Aktion abgeschlossen.",
-                ephemeral=True,
+            await interaction.edit_original_response(
+                content=message_text,
+                view=None,
             )
         else:
             await interaction.response.send_message(
-                result.user_message or "Aktion abgeschlossen.",
+                message_text,
                 ephemeral=True,
             )
 
