@@ -51,6 +51,8 @@ class PublicSearchView(discord.ui.View):
             )
             return
 
+        public_message_id = interaction.message.id if interaction.message else None
+
         result = await self._search_service.join_search(
             context=self._context,
             search_id=self._search_id,
@@ -58,7 +60,11 @@ class PublicSearchView(discord.ui.View):
             display_name=interaction.user.display_name,
         )
 
-        await self._finalize_interaction(interaction, result)
+        await self._finalize_interaction(
+            interaction,
+            result,
+            public_message_id=public_message_id,
+        )
 
     @discord.ui.button(label="Verlassen", style=discord.ButtonStyle.secondary, row=0)
     async def leave_button(
@@ -75,13 +81,19 @@ class PublicSearchView(discord.ui.View):
             )
             return
 
+        public_message_id = interaction.message.id if interaction.message else None
+
         result = await self._search_service.leave_search(
             context=self._context,
             search_id=self._search_id,
             user_id=interaction.user.id,
         )
 
-        await self._finalize_interaction(interaction, result)
+        await self._finalize_interaction(
+            interaction,
+            result,
+            public_message_id=public_message_id,
+        )
 
     @discord.ui.button(label="Schließen", style=discord.ButtonStyle.danger, row=1)
     async def close_button(
@@ -98,13 +110,19 @@ class PublicSearchView(discord.ui.View):
             )
             return
 
+        public_message_id = interaction.message.id if interaction.message else None
+
         async def _confirm_close(confirm_interaction: discord.Interaction) -> None:
             result = await self._search_service.close_search(
                 context=self._context,
                 search_id=self._search_id,
                 actor_user_id=confirm_interaction.user.id,
             )
-            await self._finalize_interaction(confirm_interaction, result)
+            await self._finalize_interaction(
+                confirm_interaction,
+                result,
+                public_message_id=public_message_id,
+            )
 
         confirm_view = ConfirmActionView(
             confirm_callback=_confirm_close,
@@ -133,13 +151,19 @@ class PublicSearchView(discord.ui.View):
             )
             return
 
+        public_message_id = interaction.message.id if interaction.message else None
+
         result = await self._search_service.open_search(
             context=self._context,
             search_id=self._search_id,
             actor_user_id=interaction.user.id,
         )
 
-        await self._finalize_interaction(interaction, result)
+        await self._finalize_interaction(
+            interaction,
+            result,
+            public_message_id=public_message_id,
+        )
 
     @discord.ui.button(label="Löschen", style=discord.ButtonStyle.danger, row=1)
     async def delete_button(
@@ -156,13 +180,19 @@ class PublicSearchView(discord.ui.View):
             )
             return
 
+        public_message_id = interaction.message.id if interaction.message else None
+
         async def _confirm_delete(confirm_interaction: discord.Interaction) -> None:
             result = await self._search_service.delete_search(
                 context=self._context,
                 search_id=self._search_id,
                 actor_user_id=confirm_interaction.user.id,
             )
-            await self._finalize_interaction(confirm_interaction, result)
+            await self._finalize_interaction(
+                confirm_interaction,
+                result,
+                public_message_id=public_message_id,
+            )
 
         confirm_view = ConfirmActionView(
             confirm_callback=_confirm_delete,
@@ -176,37 +206,60 @@ class PublicSearchView(discord.ui.View):
             ephemeral=True,
         )
 
-    async def _finalize_interaction(self, interaction: discord.Interaction, result) -> None:
+    async def _finalize_interaction(
+        self,
+        interaction: discord.Interaction,
+        result,
+        *,
+        public_message_id: int | None,
+    ) -> None:
         """
         Sendet die ephemere Rückmeldung und aktualisiert bei Bedarf die öffentliche Nachricht.
         """
         if result.changed:
-            await self._refresh_public_message(interaction, result.search)
+            await self._refresh_public_message(
+                interaction,
+                result.search,
+                public_message_id=public_message_id,
+            )
 
-        await interaction.response.send_message(
-            result.user_message or "Aktion abgeschlossen.",
-            ephemeral=True,
-        )
+        if interaction.response.is_done():
+            await interaction.followup.send(
+                result.user_message or "Aktion abgeschlossen.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                result.user_message or "Aktion abgeschlossen.",
+                ephemeral=True,
+            )
 
     async def _refresh_public_message(
         self,
         interaction: discord.Interaction,
         search: Search | None,
+        *,
+        public_message_id: int | None,
     ) -> None:
         """
         Aktualisiert die öffentliche Suchnachricht oder entfernt die View nach Löschung.
         """
-        if interaction.message is None:
+        if public_message_id is None or interaction.channel is None:
+            return
+
+        try:
+            public_message = await interaction.channel.fetch_message(public_message_id)
+        except discord.NotFound:
             return
 
         if search is None:
-            await interaction.message.edit(view=None)
+            await public_message.edit(view=None)
             return
 
         render_data = self._search_renderer.render_search(search)
         embed = self._embed_builder(render_data)
 
-        await interaction.message.edit(
+        await public_message.edit(
             embed=embed,
             view=self,
         )
