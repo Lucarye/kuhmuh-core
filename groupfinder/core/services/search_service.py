@@ -196,8 +196,16 @@ class SearchService:
             if not search:
                 return OperationResult.fail(user_message="Suche nicht gefunden.")
 
-            if search.creator_id != actor_user_id:
-                return OperationResult.fail(user_message="Nur der Ersteller darf schließen.")
+            if not self._can_manage_search(
+                context=context,
+                search=search,
+                actor_user_id=actor_user_id,
+            ):
+                return OperationResult.fail(
+                    user_message="Nur der Ersteller oder berechtigte Rollen dürfen diese Suche schließen.",
+                    error_code="not_search_manager",
+                    search=search,
+                )
 
             if search.is_closed():
                 return OperationResult.fail(user_message="Bereits geschlossen.")
@@ -229,8 +237,16 @@ class SearchService:
             if not search:
                 return OperationResult.fail(user_message="Suche nicht gefunden.")
 
-            if search.creator_id != actor_user_id:
-                return OperationResult.fail(user_message="Nur der Ersteller darf öffnen.")
+            if not self._can_manage_search(
+                context=context,
+                search=search,
+                actor_user_id=actor_user_id,
+            ):
+                return OperationResult.fail(
+                    user_message="Nur der Ersteller oder berechtigte Rollen dürfen diese Suche öffnen.",
+                    error_code="not_search_manager",
+                    search=search,
+                )
 
             if search.is_open():
                 return OperationResult.fail(user_message="Bereits offen.")
@@ -262,13 +278,38 @@ class SearchService:
             if not search:
                 return OperationResult.fail(user_message="Suche nicht gefunden.")
 
-            if search.creator_id != actor_user_id:
-                return OperationResult.fail(user_message="Nur der Ersteller darf löschen.")
+            if not self._can_manage_search(
+                context=context,
+                search=search,
+                actor_user_id=actor_user_id,
+            ):
+                return OperationResult.fail(
+                    user_message="Nur der Ersteller oder berechtigte Rollen dürfen diese Suche löschen.",
+                    error_code="not_search_manager",
+                    search=search,
+                )
 
             self._search_repository.delete(search_id, context)
 
             return OperationResult.ok(
                 changed=True,
-                user_message="Suche gelöscht.",
+                user_message="Suche wurde gelöscht.",
                 search=None,
             )
+
+    def _can_manage_search(
+        self,
+        *,
+        context: Context,
+        search: Search,
+        actor_user_id: int,
+    ) -> bool:
+        """
+        Prüft, ob ein Nutzer eine Suche verwalten darf.
+
+        Aktuell ist als sichere Baseline nur der Ersteller erlaubt.
+        Rollenlogik kann hier später zentral erweitert werden, ohne die
+        einzelnen Aktionen erneut anfassen zu müssen.
+        """
+        del context  # wird im nächsten Schritt für Rollenfreigaben genutzt
+        return search.creator_id == actor_user_id

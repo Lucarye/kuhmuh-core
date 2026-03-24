@@ -71,6 +71,7 @@ class GroupFinderCommandCog(commands.Cog):
         slots="Anzahl der Gruppenplätze.",
         title="Kurzer Titel oder Name der Suche.",
     )
+    @app_commands.autocomplete(content_key="autocomplete_content_key")
     async def gruppensuche_command(
         self,
         interaction: discord.Interaction,
@@ -158,6 +159,62 @@ class GroupFinderCommandCog(commands.Cog):
             embed=embed,
             view=view,
         )
+
+    async def autocomplete_content_key(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """
+        Liefert verfügbare Content-Keys als Slash-Command-Autocomplete.
+        """
+        del interaction  # aktuell nicht benötigt
+
+        current_lower = current.lower().strip()
+
+        choices: list[app_commands.Choice[str]] = []
+        for definition in self.groupfinder_module.list_content_definitions():
+            searchable = f"{definition.content_key} {definition.display_name}".lower()
+
+            if current_lower and current_lower not in searchable:
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=f"{definition.display_name} ({definition.content_key})",
+                    value=definition.content_key,
+                )
+            )
+
+        return choices[:25]
+
+    async def autocomplete_content_key(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """
+        Liefert verfügbare Content-Keys als Slash-Command-Autocomplete.
+        """
+        del interaction  # aktuell nicht benötigt
+
+        current_lower = current.lower().strip()
+
+        choices: list[app_commands.Choice[str]] = []
+        for definition in self.groupfinder_module.list_content_definitions():
+            searchable = f"{definition.content_key} {definition.display_name}".lower()
+
+            if current_lower and current_lower not in searchable:
+                continue
+
+            choices.append(
+                app_commands.Choice(
+                    name=f"{definition.display_name} ({definition.content_key})",
+                    value=definition.content_key,
+                )
+            )
+
+        return choices[:25]
 
     def _build_embed(self, render_data: dict) -> discord.Embed:
         """
