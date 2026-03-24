@@ -188,6 +188,7 @@ class SearchService:
         context: Context,
         search_id: str,
         actor_user_id: int,
+        actor_role_ids: tuple[int, ...] = (),
     ) -> OperationResult:
         lock = await self._lock_service.get_lock(search_id)
 
@@ -200,6 +201,7 @@ class SearchService:
                 context=context,
                 search=search,
                 actor_user_id=actor_user_id,
+                actor_role_ids=actor_role_ids,
             ):
                 return OperationResult.fail(
                     user_message="Nur der Ersteller oder berechtigte Rollen dürfen diese Suche schließen.",
@@ -229,6 +231,7 @@ class SearchService:
         context: Context,
         search_id: str,
         actor_user_id: int,
+        actor_role_ids: tuple[int, ...] = (),
     ) -> OperationResult:
         lock = await self._lock_service.get_lock(search_id)
 
@@ -241,6 +244,7 @@ class SearchService:
                 context=context,
                 search=search,
                 actor_user_id=actor_user_id,
+                actor_role_ids=actor_role_ids,
             ):
                 return OperationResult.fail(
                     user_message="Nur der Ersteller oder berechtigte Rollen dürfen diese Suche öffnen.",
@@ -270,6 +274,7 @@ class SearchService:
         context: Context,
         search_id: str,
         actor_user_id: int,
+        actor_role_ids: tuple[int, ...] = (),
     ) -> OperationResult:
         lock = await self._lock_service.get_lock(search_id)
 
@@ -282,6 +287,7 @@ class SearchService:
                 context=context,
                 search=search,
                 actor_user_id=actor_user_id,
+                actor_role_ids=actor_role_ids,
             ):
                 return OperationResult.fail(
                     user_message="Nur der Ersteller oder berechtigte Rollen dürfen diese Suche löschen.",
@@ -303,13 +309,19 @@ class SearchService:
         context: Context,
         search: Search,
         actor_user_id: int,
+        actor_role_ids: tuple[int, ...] = (),
     ) -> bool:
         """
         Prüft, ob ein Nutzer eine Suche verwalten darf.
 
-        Aktuell ist als sichere Baseline nur der Ersteller erlaubt.
-        Rollenlogik kann hier später zentral erweitert werden, ohne die
-        einzelnen Aktionen erneut anfassen zu müssen.
+        Erlaubt sind:
+        - der Ersteller der Suche
+        - Nutzer mit einer Rolle, die im aktuellen Context freigegeben ist
         """
-        del context  # wird im nächsten Schritt für Rollenfreigaben genutzt
-        return search.creator_id == actor_user_id
+        if search.creator_id == actor_user_id:
+            return True
+
+        if not context.allowed_role_ids:
+            return False
+
+        return any(role_id in context.allowed_role_ids for role_id in actor_role_ids)

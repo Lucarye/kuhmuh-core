@@ -21,7 +21,7 @@ from ..ui.views.public_views import PublicSearchView
 
 
 GUILD_ID = LIVE_CONTEXT.guild_id
-print("GUILD_ID:", GUILD_ID)
+
 
 class GroupFinderCommandCog(commands.Cog):
     """
@@ -166,41 +166,13 @@ class GroupFinderCommandCog(commands.Cog):
         current: str,
     ) -> list[app_commands.Choice[str]]:
         """
-        Liefert verfügbare Content-Keys als Slash-Command-Autocomplete.
+        Liefert verfügbare Content-Keys als Autocomplete für den Slash-Command.
         """
-        del interaction  # aktuell nicht benötigt
+        del interaction
 
         current_lower = current.lower().strip()
-
         choices: list[app_commands.Choice[str]] = []
-        for definition in self.groupfinder_module.list_content_definitions():
-            searchable = f"{definition.content_key} {definition.display_name}".lower()
 
-            if current_lower and current_lower not in searchable:
-                continue
-
-            choices.append(
-                app_commands.Choice(
-                    name=f"{definition.display_name} ({definition.content_key})",
-                    value=definition.content_key,
-                )
-            )
-
-        return choices[:25]
-
-    async def autocomplete_content_key(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> list[app_commands.Choice[str]]:
-        """
-        Liefert verfügbare Content-Keys als Slash-Command-Autocomplete.
-        """
-        del interaction  # aktuell nicht benötigt
-
-        current_lower = current.lower().strip()
-
-        choices: list[app_commands.Choice[str]] = []
         for definition in self.groupfinder_module.list_content_definitions():
             searchable = f"{definition.content_key} {definition.display_name}".lower()
 

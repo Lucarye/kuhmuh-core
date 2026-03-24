@@ -49,6 +49,17 @@ class PublicSearchView(discord.ui.View):
         self.open_button.disabled = is_open
         self.delete_button.disabled = False
 
+    @staticmethod
+    def _extract_role_ids(interaction: discord.Interaction) -> tuple[int, ...]:
+        """
+        Extrahiert Rollen-IDs aus einem Interaction-User, sofern vorhanden.
+        """
+        roles = getattr(interaction.user, "roles", None)
+        if not roles:
+            return ()
+
+        return tuple(role.id for role in roles)
+
     @discord.ui.button(label="Beitreten", style=discord.ButtonStyle.success, row=0)
     async def join_button(
         self,
@@ -130,6 +141,7 @@ class PublicSearchView(discord.ui.View):
                 context=self._context,
                 search_id=self._search_id,
                 actor_user_id=confirm_interaction.user.id,
+                actor_role_ids=self._extract_role_ids(confirm_interaction),
             )
 
             if result.changed:
@@ -177,6 +189,7 @@ class PublicSearchView(discord.ui.View):
             context=self._context,
             search_id=self._search_id,
             actor_user_id=interaction.user.id,
+            actor_role_ids=self._extract_role_ids(interaction),
         )
 
         await self._finalize_interaction(
@@ -212,6 +225,7 @@ class PublicSearchView(discord.ui.View):
                 context=self._context,
                 search_id=self._search_id,
                 actor_user_id=confirm_interaction.user.id,
+                actor_role_ids=self._extract_role_ids(confirm_interaction),
             )
 
             if result.changed:
