@@ -20,16 +20,7 @@ from ..ui.renderers.search_renderer import SearchRenderer
 from ..ui.views.public_views import PublicSearchView
 
 
-GUILD_OBJECTS = tuple(
-    discord.Object(id=guild_id)
-    for guild_id in {
-        LIVE_CONTEXT.guild_id,
-        TEST_CONTEXT.guild_id,
-    }
-    if guild_id
-)
-
-print("GUILD_OBJECTS:", GUILD_OBJECTS)
+GUILD_ID = LIVE_CONTEXT.guild_id
 
 
 class GroupFinderCommandCog(commands.Cog):
@@ -73,14 +64,14 @@ class GroupFinderCommandCog(commands.Cog):
             ]
         )
 
-    @app_commands.guilds(*GUILD_OBJECTS)
+    @app_commands.guilds(discord.Object(id=GUILD_ID))
     @app_commands.command(name="gruppensuche_v2", description="Erstellt eine neue Gruppensuche (V2).")
     @app_commands.describe(
         content_key="Der Content-Typ der Suche.",
         slots="Anzahl der Gruppenplätze.",
         title="Kurzer Titel oder Name der Suche.",
     )
-    async def gruppensuche(
+    async def gruppensuche_command(
         self,
         interaction: discord.Interaction,
         content_key: str,
