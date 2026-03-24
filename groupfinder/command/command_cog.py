@@ -29,6 +29,8 @@ GUILD_OBJECTS = tuple(
     if guild_id
 )
 
+print("GUILD_OBJECTS:", GUILD_OBJECTS)
+
 
 class GroupFinderCommandCog(commands.Cog):
     """
@@ -101,7 +103,8 @@ class GroupFinderCommandCog(commands.Cog):
         if hasattr(interaction.user, "roles"):
             role_ids = [role.id for role in interaction.user.roles]
 
-        category_id = getattr(getattr(interaction.channel, "category", None), "id", None)
+        category_id = getattr(
+            getattr(interaction.channel, "category", None), "id", None)
 
         context = self.context_router.resolve(
             guild_id=interaction.guild.id,

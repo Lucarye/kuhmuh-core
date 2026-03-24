@@ -1,1 +1,0 @@
-print("GUILDS:", GUILD_OBJECTS)
