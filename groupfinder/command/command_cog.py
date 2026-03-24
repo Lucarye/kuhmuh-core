@@ -21,7 +21,7 @@ from ..ui.views.public_views import PublicSearchView
 
 
 GUILD_ID = LIVE_CONTEXT.guild_id
-
+print("GUILD_ID:", GUILD_ID)
 
 class GroupFinderCommandCog(commands.Cog):
     """
