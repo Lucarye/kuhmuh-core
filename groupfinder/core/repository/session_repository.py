@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Any
 
 from ..models.context import Context
 from ..models.session import FlowSession
@@ -8,57 +8,97 @@ from ..models.session import FlowSession
 
 class SessionRepository:
     """
-    In-Memory-Repository für Flow-Sessions.
+    Repository für Flow-Sessions.
 
-    Sessions sind temporäre Zustandsobjekte für UI- und Erstell-/Edit-Flows.
-    Das Repository trennt auch diesen Speicherzugriff sauber vom restlichen Core.
+    Sessions werden intern als serialisierte Daten gehalten, damit persistente
+    Speicherung und Restart-Recovery später sauber darauf aufbauen können.
     """
 
     def __init__(self) -> None:
-        self._storage: dict[str, Dict[int, FlowSession]] = {}
+        self._storage: dict[str, dict[str, dict[str, Any]]] = {}
 
-    def get(self, user_id: int, context: Context) -> FlowSession | None:
-        """Lädt die Session eines Users im gegebenen Context."""
+    @staticmethod
+    def _session_key(user_id: int, guild_id: int) -> str:
+        """
+        Baut einen stabilen Schlüssel für eine Session.
+        """
+        return f"{user_id}:{guild_id}"
+
+    def get(self, user_id: int, guild_id: int, context: Context) -> FlowSession | None:
+        """
+        Lädt eine Session anhand von User-ID, Guild-ID und Context.
+        """
         namespace = self._get_namespace(context)
-        return self._storage.get(namespace, {}).get(user_id)
+        bucket = self._storage.get(namespace, {})
+        session_data = bucket.get(self._session_key(user_id, guild_id))
+        if session_data is None:
+            return None
+
+        return FlowSession.from_dict(session_data)
 
     def save(self, session: FlowSession, context: Context) -> FlowSession:
-        """Speichert oder überschreibt eine Session im gegebenen Context."""
+        """
+        Speichert oder überschreibt eine Session.
+        """
         namespace = self._get_namespace(context)
         bucket = self._storage.setdefault(namespace, {})
-        bucket[session.user_id] = session
+        bucket[self._session_key(session.user_id, session.guild_id)] = session.to_dict()
         return session
 
-    def delete(self, user_id: int, context: Context) -> FlowSession | None:
-        """Entfernt die Session eines Users im gegebenen Context."""
-        namespace = self._get_namespace(context)
-        bucket = self._storage.get(namespace, {})
-        return bucket.pop(user_id, None)
-
-    def cleanup_expired(self, context: Context) -> list[FlowSession]:
+    def delete(self, user_id: int, guild_id: int, context: Context) -> FlowSession | None:
         """
-        Entfernt alle abgelaufenen Sessions im gegebenen Context
-        und gibt die entfernten Sessions zurück.
+        Löscht eine Session und gibt sie zurück, falls vorhanden.
         """
         namespace = self._get_namespace(context)
         bucket = self._storage.get(namespace, {})
+        session_data = bucket.pop(self._session_key(user_id, guild_id), None)
+        if session_data is None:
+            return None
 
-        expired_user_ids = [
-            user_id for user_id, session in bucket.items() if session.is_expired()
+        return FlowSession.from_dict(session_data)
+
+    def list_by_context(self, context: Context) -> list[FlowSession]:
+        """
+        Gibt alle Sessions des angegebenen Contexts zurück.
+        """
+        namespace = self._get_namespace(context)
+        bucket = self._storage.get(namespace, {})
+        return [
+            FlowSession.from_dict(session_data)
+            for session_data in bucket.values()
         ]
 
-        removed_sessions: list[FlowSession] = []
-        for user_id in expired_user_ids:
-            removed = bucket.pop(user_id, None)
-            if removed is not None:
-                removed_sessions.append(removed)
-
-        return removed_sessions
-
     def clear_context(self, context: Context) -> None:
-        """Entfernt alle Sessions des gegebenen Contexts."""
+        """
+        Entfernt alle Sessions eines Contexts.
+        """
         namespace = self._get_namespace(context)
         self._storage.pop(namespace, None)
+
+    def export_context_data(self, context: Context) -> dict[str, dict[str, Any]]:
+        """
+        Exportiert die serialisierten Session-Daten eines Contexts.
+        """
+        namespace = self._get_namespace(context)
+        bucket = self._storage.get(namespace, {})
+        return {
+            session_key: dict(session_data)
+            for session_key, session_data in bucket.items()
+        }
+
+    def import_context_data(
+        self,
+        context: Context,
+        data: dict[str, dict[str, Any]],
+    ) -> None:
+        """
+        Importiert serialisierte Session-Daten in einen Context-Bucket.
+        """
+        namespace = self._get_namespace(context)
+        self._storage[namespace] = {
+            str(session_key): dict(session_data)
+            for session_key, session_data in data.items()
+        }
 
     @staticmethod
     def _get_namespace(context: Context) -> str:
