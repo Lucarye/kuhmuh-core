@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
+from ..utils.datetime_utils import datetime_from_storage, datetime_to_storage, utc_now
 from .participant import Participant
 
 
@@ -37,8 +38,8 @@ class Search:
     public_message_id: int | None = None
     dashboard_message_id: int | None = None
 
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
 
     def is_open(self) -> bool:
         """Gibt zurück, ob die Suche aktuell offen ist."""
@@ -141,4 +142,70 @@ class Search:
 
     def touch(self) -> None:
         """Aktualisiert den Änderungszeitpunkt der Suche."""
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = utc_now()
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Serialisiert die Suche in eine JSON-kompatible Storage-Struktur.
+
+        Zeitwerte werden immer als UTC-ISO-String gespeichert.
+        """
+        return {
+            "search_id": self.search_id,
+            "module_key": self.module_key,
+            "content_key": self.content_key,
+            "context_key": self.context_key,
+            "guild_id": self.guild_id,
+            "channel_id": self.channel_id,
+            "creator_id": self.creator_id,
+            "status": self.status,
+            "slots_total": self.slots_total,
+            "participants": [participant.to_dict() for participant in self.participants],
+            "waitlist": [participant.to_dict() for participant in self.waitlist],
+            "payload": dict(self.payload),
+            "public_message_id": self.public_message_id,
+            "dashboard_message_id": self.dashboard_message_id,
+            "created_at": datetime_to_storage(self.created_at),
+            "updated_at": datetime_to_storage(self.updated_at),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Search":
+        """
+        Deserialisiert eine Suche aus einer Storage-Struktur.
+
+        Fehlende optionale Felder werden defensiv mit Defaults ergänzt.
+        """
+        return cls(
+            search_id=str(data["search_id"]),
+            module_key=str(data.get("module_key", "")),
+            content_key=str(data.get("content_key", "")),
+            context_key=str(data.get("context_key", "")),
+            guild_id=int(data.get("guild_id", 0)),
+            channel_id=int(data.get("channel_id", 0)),
+            creator_id=int(data.get("creator_id", 0)),
+            status=str(data.get("status", "OPEN")),
+            slots_total=int(data.get("slots_total", 0)),
+            participants=[
+                Participant.from_dict(item)
+                for item in data.get("participants", [])
+            ],
+            waitlist=[
+                Participant.from_dict(item)
+                for item in data.get("waitlist", [])
+            ],
+            payload=dict(data.get("payload", {})),
+            public_message_id=cls._optional_int(data.get("public_message_id")),
+            dashboard_message_id=cls._optional_int(data.get("dashboard_message_id")),
+            created_at=datetime_from_storage(data.get("created_at")),
+            updated_at=datetime_from_storage(data.get("updated_at")),
+        )
+
+    @staticmethod
+    def _optional_int(value: Any) -> int | None:
+        """
+        Wandelt einen optionalen Storage-Wert in int | None um.
+        """
+        if value is None:
+            return None
+        return int(value)
