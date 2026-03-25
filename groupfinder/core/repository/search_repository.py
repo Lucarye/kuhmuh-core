@@ -97,4 +97,4 @@ class SearchRepository:
     @staticmethod
     def _get_namespace(context: Context) -> str:
         """Leitet den internen Speicher-Namespace aus dem Context ab."""
-        return context.storage_namespace
+        return f"v2:{context.storage_namespace}"
