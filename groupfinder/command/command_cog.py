@@ -71,7 +71,7 @@ class GroupFinderCommandCog(commands.Cog):
         slots="Anzahl der Gruppenplätze.",
         title="Kurzer Titel oder Name der Suche.",
     )
-    @app_commands.autocomplete(content_key="autocomplete_content_key")
+    @app_commands.autocomplete(content_key=autocomplete_content_key)
     async def gruppensuche_command(
         self,
         interaction: discord.Interaction,
