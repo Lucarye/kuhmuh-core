@@ -1,111 +1,94 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any
+from ..models.context import Context
+from ..models.session import FlowSession
+from ..repository.session_repository import SessionRepository
 
 
-@dataclass(slots=True)
-class FlowSession:
+class SessionService:
     """
-    Temporärer Zustandscontainer für Create- und Edit-Flows.
+    Verwalter für Flow-Sessions.
 
-    Die Session hält bewusst nur Flow- und Payload-Daten.
-    Discord-spezifische Objekte oder UI-Zustände gehören nicht in dieses Modell.
+    Der Service kapselt den Lebenszyklus temporärer Create-/Edit-Sessions
+    oberhalb des SessionRepository.
     """
 
-    user_id: int
-    guild_id: int
-    mode: str
-    module_key: str
+    def __init__(self, session_repository: SessionRepository) -> None:
+        self._session_repository = session_repository
 
-    current_step: str
-    payload: dict[str, Any] = field(default_factory=dict)
-
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc) + timedelta(minutes=15)
-    )
-
-    def is_expired(self, now: datetime | None = None) -> bool:
-        """Prüft, ob die Session bereits abgelaufen ist."""
-        now = now or datetime.now(timezone.utc)
-        return now >= self.expires_at
-
-    def set_step(self, step: str) -> None:
-        """Aktualisiert den aktuellen Flow-Schritt."""
-        self.current_step = step
-
-    def update_payload(self, **values: Any) -> None:
-        """Ergänzt oder überschreibt Werte im Session-Payload."""
-        self.payload.update(values)
-
-    def extend(self, minutes: int = 15) -> None:
-        """Verlängert die Session ab jetzt um die angegebene Anzahl Minuten."""
-        self.expires_at = datetime.now(timezone.utc) + timedelta(minutes=minutes)
-
-    def to_dict(self) -> dict[str, Any]:
+    def create_session(
+        self,
+        *,
+        context: Context,
+        user_id: int,
+        guild_id: int,
+        mode: str,
+        module_key: str,
+        current_step: str,
+        payload: dict | None = None,
+    ) -> FlowSession:
         """
-        Serialisiert die Flow-Session in eine JSON-kompatible Storage-Struktur.
-
-        Zeitwerte werden immer als UTC-ISO-String gespeichert.
+        Erstellt und speichert eine neue Flow-Session.
         """
-        return {
-            "user_id": self.user_id,
-            "guild_id": self.guild_id,
-            "mode": self.mode,
-            "module_key": self.module_key,
-            "current_step": self.current_step,
-            "payload": dict(self.payload),
-            "created_at": self._datetime_to_storage(self.created_at),
-            "expires_at": self._datetime_to_storage(self.expires_at),
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "FlowSession":
-        """
-        Deserialisiert eine Flow-Session aus einer Storage-Struktur.
-
-        Fehlende optionale Felder werden defensiv mit Defaults ergänzt.
-        """
-        return cls(
-            user_id=int(data["user_id"]),
-            guild_id=int(data.get("guild_id", 0)),
-            mode=str(data.get("mode", "")),
-            module_key=str(data.get("module_key", "")),
-            current_step=str(data.get("current_step", "")),
-            payload=dict(data.get("payload", {})),
-            created_at=cls._datetime_from_storage(data.get("created_at")),
-            expires_at=cls._datetime_from_storage(data.get("expires_at")),
+        session = FlowSession(
+            user_id=user_id,
+            guild_id=guild_id,
+            mode=mode,
+            module_key=module_key,
+            current_step=current_step,
+            payload=payload or {},
         )
+        return self._session_repository.save(session, context)
 
-    @staticmethod
-    def _datetime_to_storage(value: datetime) -> str:
+    def get_session(self, *, context: Context, user_id: int) -> FlowSession | None:
         """
-        Wandelt ein datetime in einen UTC-ISO-String für Storage um.
+        Lädt die Session eines Nutzers, sofern vorhanden und nicht abgelaufen.
         """
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        else:
-            value = value.astimezone(timezone.utc)
+        session = self._session_repository.get(user_id, context)
+        if session is None:
+            return None
 
-        return value.isoformat()
+        if session.is_expired():
+            self._session_repository.delete(user_id, context)
+            return None
 
-    @staticmethod
-    def _datetime_from_storage(value: Any) -> datetime:
+        return session
+
+    def update_session(
+        self,
+        *,
+        context: Context,
+        user_id: int,
+        current_step: str | None = None,
+        payload_updates: dict | None = None,
+        extend_minutes: int | None = 15,
+    ) -> FlowSession | None:
         """
-        Wandelt einen Storage-Wert defensiv in ein timezone-aware UTC-datetime um.
+        Aktualisiert eine bestehende Session und speichert sie erneut.
         """
-        if not value:
-            return datetime.now(timezone.utc)
+        session = self.get_session(context=context, user_id=user_id)
+        if session is None:
+            return None
 
-        if isinstance(value, datetime):
-            if value.tzinfo is None:
-                return value.replace(tzinfo=timezone.utc)
-            return value.astimezone(timezone.utc)
+        if current_step is not None:
+            session.set_step(current_step)
 
-        parsed = datetime.fromisoformat(str(value))
-        if parsed.tzinfo is None:
-            return parsed.replace(tzinfo=timezone.utc)
+        if payload_updates:
+            session.update_payload(**payload_updates)
 
-        return parsed.astimezone(timezone.utc)
+        if extend_minutes is not None:
+            session.extend(minutes=extend_minutes)
+
+        return self._session_repository.save(session, context)
+
+    def delete_session(self, *, context: Context, user_id: int) -> FlowSession | None:
+        """
+        Entfernt die Session eines Nutzers.
+        """
+        return self._session_repository.delete(user_id, context)
+
+    def cleanup_expired_sessions(self, *, context: Context) -> list[FlowSession]:
+        """
+        Entfernt alle abgelaufenen Sessions eines Contexts.
+        """
+        return self._session_repository.cleanup_expired(context)
