@@ -358,18 +358,17 @@ class LoggingCog(commands.Cog):
                     after.global_name or "nicht gesetzt",
                 )
             )
-        if avatar_changed:
-            before_avatar = before.avatar.url if before.avatar else "kein Avatar"
-            after_avatar = after.avatar.url if after.avatar else "kein Avatar"
-            changed_values.append(("Avatar", before_avatar, after_avatar))
-
         embed = _embed("member", "Discord-Profil geändert")
         embed.add_field(name="Mitglied", value=_user_lines(after), inline=False)
         for label, old_value, new_value in changed_values:
             embed.add_field(name=f"{label} vorher", value=old_value, inline=True)
             embed.add_field(name=f"{label} nachher", value=new_value, inline=True)
-        if avatar_changed and after.avatar:
-            embed.set_thumbnail(url=after.avatar.url)
+        if avatar_changed:
+            if before.avatar:
+                embed.set_image(url=before.avatar.url)
+            if after.avatar:
+                embed.set_thumbnail(url=after.avatar.url)
+            embed.add_field(name="Avatar", value="Vorher: großes Bild · Nachher: Thumbnail", inline=False)
         embed.add_field(name="Zeit", value=_timestamp(), inline=False)
         await self.send_log(guild, "member", embed)
 
