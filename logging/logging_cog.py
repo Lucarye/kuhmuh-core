@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 
 import discord
-from redbot.core import app_commands, commands
+from redbot.core import Config, app_commands, commands
 
 
 GUILD_ID = 1198649628787212458
@@ -29,6 +29,17 @@ CATEGORY_CHOICES = [
     app_commands.Choice(name="Join-/Leave", value="join_leave"),
 ]
 
+ACTION_CHOICES = [
+    app_commands.Choice(name="Konfiguration anzeigen", value="show"),
+    app_commands.Choice(name="Zielchannel setzen", value="set"),
+    app_commands.Choice(name="Bereich deaktivieren", value="disable"),
+    app_commands.Choice(name="Zielchannel zurücksetzen", value="reset"),
+    app_commands.Choice(name="Beispiel ausgeben", value="preview"),
+]
+
+LOG_CATEGORIES = ("message", "member", "server", "voice", "join_leave")
+DEFAULT_GUILD = {"channels": {category: 0 for category in LOG_CATEGORIES}}
+
 
 def _category_label(value: str) -> str:
     return next(
@@ -44,10 +55,7 @@ def _timestamp(value: dt.datetime | None = None) -> str:
 
 def _user_lines(user: discord.abc.User) -> str:
     username = getattr(user, "name", "unbekannt")
-    display_name = getattr(user, "display_name", username)
     identity = f"{username} · {user.id}"
-    if display_name != username:
-        identity = f"{display_name} · {identity}"
     return f"{user.mention}\n{identity}"
 
 
@@ -75,6 +83,8 @@ class LoggingCog(commands.Cog):
 
     def __init__(self, bot) -> None:
         self.bot = bot
+        self.config = Config.get_conf(self, identifier=0x4B55484D554C4F47, force_registration=True)
+        self.config.register_guild(**DEFAULT_GUILD)
         self._startup_task = self.bot.loop.create_task(self._startup_guild_sync())
 
     async def _startup_guild_sync(self) -> None:
@@ -84,15 +94,21 @@ class LoggingCog(commands.Cog):
 
     @app_commands.guilds(discord.Object(id=GUILD_ID))
     @app_commands.command(
-        name="logging_test",
-        description="Sendet visuelle Test-Embeds fuer das Logging.",
+        name="logging",
+        description="Verwaltet die fuenf Discord-Logging-Bereiche.",
     )
-    @app_commands.describe(category="Ein Bereich oder alle fuenf Bereiche")
-    @app_commands.choices(category=CATEGORY_CHOICES)
-    async def logging_test(
+    @app_commands.describe(
+        action="Verwaltungsaktion",
+        category="Logging-Bereich fuer die Aktion",
+        channel="Zielchannel fuer den Bereich",
+    )
+    @app_commands.choices(action=ACTION_CHOICES, category=CATEGORY_CHOICES)
+    async def logging_command(
         self,
         interaction: discord.Interaction,
-        category: str,
+        action: app_commands.Choice[str],
+        category: app_commands.Choice[str] | None = None,
+        channel: discord.TextChannel | None = None,
     ) -> None:
         if not self._is_authorized(interaction):
             await interaction.response.send_message(
@@ -101,18 +117,78 @@ class LoggingCog(commands.Cog):
             )
             return
 
-        if interaction.guild is None or interaction.user is None:
+        if interaction.guild is None:
             await interaction.response.send_message(
-                "Der Test kann nur auf dem Kuhmuh-Server ausgefuehrt werden.",
+                "Die Logging-Verwaltung kann nur auf dem Kuhmuh-Server ausgefuehrt werden.",
                 ephemeral=True,
             )
             return
 
-        embeds = self._build_test_embeds(interaction, category)
-        await interaction.response.send_message(
-            content=f"{len(embeds)} Logging-Test-Embed(s) fuer **{_category_label(category)}**.",
-            embeds=embeds,
-        )
+        if action.value == "show":
+            await self._show_configuration(interaction)
+            return
+
+        if category is None:
+            await interaction.response.send_message(
+                "Bitte waehle genau einen Logging-Bereich aus.", ephemeral=True
+            )
+            return
+
+        if action.value == "preview" and category.value == "all":
+            sent_categories = []
+            for category_name in LOG_CATEGORIES:
+                embeds = self._build_test_embeds(interaction, category_name)
+                if await self._send_category_embeds(interaction.guild, category_name, embeds):
+                    sent_categories.append(_category_label(category_name))
+            result = ", ".join(sent_categories) if sent_categories else "keiner"
+            await interaction.response.send_message(
+                f"Beispiele ausgegeben fuer: {result}.", ephemeral=True
+            )
+            return
+
+        if category.value == "all":
+            await interaction.response.send_message(
+                "Fuer diese Aktion muss ein einzelner Logging-Bereich gewaehlt werden.",
+                ephemeral=True,
+            )
+            return
+
+        if action.value == "set":
+            if channel is None:
+                await interaction.response.send_message(
+                    "Zum Setzen muss ein Zielchannel angegeben werden.", ephemeral=True
+                )
+                return
+            await self.config.guild(interaction.guild).channels.set(
+                {**await self.config.guild(interaction.guild).channels(), category.value: channel.id}
+            )
+            await interaction.response.send_message(
+                f"{_category_label(category.value)} wird jetzt nach {channel.mention} geloggt.",
+                ephemeral=True,
+            )
+            return
+
+        if action.value in {"disable", "reset"}:
+            channels = await self.config.guild(interaction.guild).channels()
+            channels[category.value] = 0
+            await self.config.guild(interaction.guild).channels.set(channels)
+            await interaction.response.send_message(
+                f"{_category_label(category.value)} wurde deaktiviert.", ephemeral=True
+            )
+            return
+
+        if action.value == "preview":
+            embeds = self._build_test_embeds(interaction, category.value)
+            sent = await self._send_category_embeds(interaction.guild, category.value, embeds)
+            if sent:
+                await interaction.response.send_message(
+                    f"Beispiel fuer {_category_label(category.value)} wurde im konfigurierten Channel ausgegeben.",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_message(
+                    "Fuer diesen Bereich ist kein Zielchannel konfiguriert.", ephemeral=True
+                )
 
     def _is_authorized(self, interaction: discord.Interaction) -> bool:
         user = interaction.user
@@ -121,7 +197,41 @@ class LoggingCog(commands.Cog):
         if user.id == OWNER_ID:
             return True
         role_ids = {role.id for role in getattr(user, "roles", ())}
-        return bool(role_ids & {ADMIN_ROLE_ID, OFFIZIER_ROLE_ID, TEST_ROLE_ID})
+        return bool(role_ids & {ADMIN_ROLE_ID, OFFIZIER_ROLE_ID})
+
+    async def _show_configuration(self, interaction: discord.Interaction) -> None:
+        channels = await self.config.guild(interaction.guild).channels()
+        embed = _embed("server", "Logging-Konfiguration")
+        embed.description = "Jeder Bereich besitzt einen unabhängigen Zielchannel."
+        for category in LOG_CATEGORIES:
+            channel_id = channels.get(category, 0)
+            target = f"<#{channel_id}>" if channel_id else "deaktiviert"
+            embed.add_field(name=_category_label(category), value=target, inline=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    async def _send_category_embeds(
+        self,
+        guild: discord.Guild,
+        category: str,
+        embeds: list[discord.Embed],
+    ) -> bool:
+        channel_id = (await self.config.guild(guild).channels()).get(category, 0)
+        channel = guild.get_channel(channel_id) if channel_id else None
+        if not isinstance(channel, discord.TextChannel):
+            return False
+        await channel.send(embeds=embeds)
+        return True
+
+    async def send_log(
+        self,
+        guild: discord.Guild,
+        category: str,
+        embed: discord.Embed,
+    ) -> bool:
+        """Sendet spaetere Ereignis-Embeds ohne Fallback in einen anderen Bereich."""
+        if category not in LOG_CATEGORIES:
+            return False
+        return await self._send_category_embeds(guild, category, [embed])
 
     def _build_test_embeds(
         self,
