@@ -233,6 +233,189 @@ class LoggingCog(commands.Cog):
             return False
         return await self._send_category_embeds(guild, category, [embed])
 
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent) -> None:
+        """Loggt geloeschte Nachrichten, sofern der Message-Bereich konfiguriert ist."""
+        if payload.guild_id != GUILD_ID:
+            return
+
+        channels = await self.config.guild_from_id(GUILD_ID).channels()
+        log_channel_id = channels.get("message", 0)
+        if not log_channel_id or payload.channel_id == log_channel_id:
+            return
+
+        guild = self.bot.get_guild(GUILD_ID)
+        if guild is None:
+            return
+
+        cached_message = payload.cached_message
+        embed = _embed("message", "Nachricht gelöscht")
+        if cached_message is not None and cached_message.author is not None:
+            embed.add_field(name="Autor", value=_user_lines(cached_message.author), inline=True)
+        else:
+            embed.add_field(name="Autor", value="nicht verfügbar (Nachricht nicht im Cache)", inline=True)
+        embed.add_field(name="Channel", value=f"<#${payload.channel_id}>".replace("$", ""), inline=True)
+        content = cached_message.content if cached_message is not None else "nicht verfügbar"
+        embed.add_field(name="Ursprünglicher Inhalt", value=content[:1020] or "(leer)", inline=False)
+        embed.add_field(name="Nachricht", value=f"`{payload.message_id}`", inline=True)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=True)
+        await self.send_log(guild, "message", embed)
+
+    async def on_message_edit(
+        self,
+        before: discord.Message,
+        after: discord.Message,
+    ) -> None:
+        if before.guild is None or before.guild.id != GUILD_ID:
+            return
+        if before.content == after.content:
+            return
+        embed = _embed("message", "Nachricht bearbeitet")
+        embed.add_field(name="Nutzer", value=_user_lines(after.author), inline=True)
+        embed.add_field(name="Channel", value=after.channel.mention, inline=True)
+        embed.add_field(
+            name="Nachricht",
+            value=f"`{after.id}`\n[Zur Nachricht]({after.jump_url})",
+            inline=False,
+        )
+        embed.add_field(name="Vorher", value=before.content[:1020] or "(leer)", inline=True)
+        embed.add_field(name="Nachher", value=after.content[:1020] or "(leer)", inline=True)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+        await self.send_log(before.guild, "message", embed)
+
+    async def on_member_update(
+        self,
+        before: discord.Member,
+        after: discord.Member,
+    ) -> None:
+        if after.guild.id != GUILD_ID:
+            return
+        before_roles = {role.id: role for role in before.roles}
+        after_roles = {role.id: role for role in after.roles}
+        added_roles = [after_roles[role_id] for role_id in after_roles.keys() - before_roles.keys()]
+        removed_roles = [before_roles[role_id] for role_id in before_roles.keys() - after_roles.keys()]
+        for role, title in [(role, "Rolle hinzugefügt") for role in added_roles] + [
+            (role, "Rolle entfernt") for role in removed_roles
+        ]:
+            embed = _embed("member", title)
+            embed.add_field(name="Mitglied", value=_user_lines(after), inline=False)
+            embed.add_field(name="Rolle", value=role.mention, inline=True)
+            embed.add_field(name="Zeit", value=_timestamp(), inline=True)
+            await self.send_log(after.guild, "member", embed)
+
+    async def on_guild_channel_update(
+        self,
+        before: discord.abc.GuildChannel,
+        after: discord.abc.GuildChannel,
+    ) -> None:
+        if after.guild.id != GUILD_ID:
+            return
+        before_overwrites = getattr(before, "overwrites", {})
+        after_overwrites = getattr(after, "overwrites", {})
+        changes = []
+        permission_names = (
+            ("send_messages", "Nachrichten senden"),
+            ("attach_files", "Dateien anhängen"),
+            ("add_reactions", "Reaktionen hinzufügen"),
+        )
+        for target in set(before_overwrites) | set(after_overwrites):
+            old = before_overwrites.get(target, discord.PermissionOverwrite())
+            new = after_overwrites.get(target, discord.PermissionOverwrite())
+            for permission_name, label in permission_names:
+                old_state = self._permission_state(old, permission_name)
+                new_state = self._permission_state(new, permission_name)
+                if old_state != new_state:
+                    changes.append((target, label, old_state, new_state))
+        for target, label, old_state, new_state in changes:
+            embed = _embed("server", "Channel-Rechte geändert")
+            embed.add_field(name="Channel", value=after.mention, inline=True)
+            embed.add_field(name="Betroffen", value=target.mention, inline=True)
+            embed.add_field(
+                name="Geänderte Permission",
+                value=f"{label}: {old_state} → {new_state}",
+                inline=False,
+            )
+            embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+            await self.send_log(after.guild, "server", embed)
+
+    async def on_voice_state_update(
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
+    ) -> None:
+        if member.guild.id != GUILD_ID:
+            return
+        title = None
+        details = []
+        if before.channel != after.channel:
+            if before.channel is None:
+                title, details = "Voice-Channel beigetreten", [("Channel", after.channel.mention)]
+            elif after.channel is None:
+                title, details = "Voice-Channel verlassen", [("Channel", before.channel.mention)]
+            else:
+                title = "Voice-Channel gewechselt"
+                details = [("Vorher", before.channel.mention), ("Nachher", after.channel.mention)]
+        else:
+            state_labels = (
+                ("self_mute", "Self Mute"),
+                ("self_deaf", "Self Deaf"),
+                ("mute", "Server Mute"),
+                ("deaf", "Server Deaf"),
+                ("self_stream", "Stream"),
+                ("self_video", "Kamera / Video"),
+            )
+            for attribute, label in state_labels:
+                old_value = getattr(before, attribute)
+                new_value = getattr(after, attribute)
+                if old_value != new_value:
+                    title = f"{label} {'aktiviert' if new_value else 'deaktiviert'}"
+                    break
+        if title is None:
+            return
+        embed = _embed("voice", title)
+        embed.add_field(name="Mitglied", value=_user_lines(member), inline=False)
+        for label, value in details:
+            embed.add_field(name=label, value=value, inline=True)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+        await self.send_log(member.guild, "voice", embed)
+
+    async def on_member_join(self, member: discord.Member) -> None:
+        if member.guild.id != GUILD_ID:
+            return
+        embed = _embed("join_leave", "Mitglied beigetreten")
+        embed.add_field(name="Nutzer", value=_user_lines(member), inline=False)
+        embed.add_field(name="Account erstellt", value=_timestamp(member.created_at), inline=True)
+        embed.add_field(name="Server beigetreten", value=_timestamp(member.joined_at), inline=True)
+        embed.add_field(name="Mitglieder", value=str(member.guild.member_count or "unbekannt"), inline=True)
+        avatar = getattr(member, "display_avatar", None)
+        if avatar:
+            embed.set_thumbnail(url=avatar.url)
+        await self.send_log(member.guild, "join_leave", embed)
+
+    async def on_member_remove(self, member: discord.Member) -> None:
+        if member.guild.id != GUILD_ID:
+            return
+        left_at = discord.utils.utcnow()
+        embed = _embed("join_leave", "Mitglied verlassen")
+        embed.add_field(name="Letzter Nutzer", value=_user_lines(member), inline=False)
+        embed.add_field(name="Server beigetreten", value=_timestamp(member.joined_at), inline=True)
+        embed.add_field(name="Server verlassen", value=_timestamp(left_at), inline=True)
+        embed.add_field(name="Letzte Rollen", value=" ".join(role.mention for role in member.roles[1:]) or "keine", inline=False)
+        embed.add_field(name="Mitglieder", value=str(max((member.guild.member_count or 1) - 1, 0)), inline=True)
+        avatar = getattr(member, "display_avatar", None)
+        if avatar:
+            embed.set_thumbnail(url=avatar.url)
+        await self.send_log(member.guild, "join_leave", embed)
+
+    @staticmethod
+    def _permission_state(overwrite: discord.PermissionOverwrite, name: str) -> str:
+        value = getattr(overwrite, name)
+        if value is True:
+            return "✅"
+        if value is False:
+            return "❌"
+        return "➖"
+
     def _build_test_embeds(
         self,
         interaction: discord.Interaction,
