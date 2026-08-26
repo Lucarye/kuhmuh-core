@@ -233,6 +233,7 @@ class LoggingCog(commands.Cog):
             return False
         return await self._send_category_embeds(guild, category, [embed])
 
+    @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent) -> None:
         """Loggt geloeschte Nachrichten, sofern der Message-Bereich konfiguriert ist."""
         if payload.guild_id != GUILD_ID:
@@ -260,6 +261,7 @@ class LoggingCog(commands.Cog):
         embed.add_field(name="Zeit", value=_timestamp(), inline=True)
         await self.send_log(guild, "message", embed)
 
+    @commands.Cog.listener()
     async def on_message_edit(
         self,
         before: discord.Message,
@@ -282,6 +284,7 @@ class LoggingCog(commands.Cog):
         embed.add_field(name="Zeit", value=_timestamp(), inline=False)
         await self.send_log(before.guild, "message", embed)
 
+    @commands.Cog.listener()
     async def on_member_update(
         self,
         before: discord.Member,
@@ -302,6 +305,7 @@ class LoggingCog(commands.Cog):
             embed.add_field(name="Zeit", value=_timestamp(), inline=True)
             await self.send_log(after.guild, "member", embed)
 
+    @commands.Cog.listener()
     async def on_guild_channel_update(
         self,
         before: discord.abc.GuildChannel,
@@ -337,6 +341,7 @@ class LoggingCog(commands.Cog):
             embed.add_field(name="Zeit", value=_timestamp(), inline=False)
             await self.send_log(after.guild, "server", embed)
 
+    @commands.Cog.listener()
     async def on_voice_state_update(
         self,
         member: discord.Member,
@@ -379,6 +384,7 @@ class LoggingCog(commands.Cog):
         embed.add_field(name="Zeit", value=_timestamp(), inline=False)
         await self.send_log(member.guild, "voice", embed)
 
+    @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
         if member.guild.id != GUILD_ID:
             return
@@ -392,6 +398,7 @@ class LoggingCog(commands.Cog):
             embed.set_thumbnail(url=avatar.url)
         await self.send_log(member.guild, "join_leave", embed)
 
+    @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member) -> None:
         if member.guild.id != GUILD_ID:
             return
