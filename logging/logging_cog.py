@@ -85,6 +85,7 @@ class LoggingCog(commands.Cog):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=0x4B55484D554C4F47, force_registration=True)
         self.config.register_guild(**DEFAULT_GUILD)
+        self._handled_delete_ids: set[int] = set()
         self._startup_task = self.bot.loop.create_task(self._startup_guild_sync())
 
     async def _startup_guild_sync(self) -> None:
@@ -239,6 +240,9 @@ class LoggingCog(commands.Cog):
         if payload.guild_id != GUILD_ID:
             return
 
+        if payload.message_id in self._handled_delete_ids:
+            return
+
         channels = await self.config.guild_from_id(GUILD_ID).channels()
         log_channel_id = channels.get("message", 0)
         if not log_channel_id or payload.channel_id == log_channel_id:
@@ -259,7 +263,25 @@ class LoggingCog(commands.Cog):
         embed.add_field(name="Ursprünglicher Inhalt", value=content[:1020] or "(leer)", inline=False)
         embed.add_field(name="Nachricht", value=f"`{payload.message_id}`", inline=True)
         embed.add_field(name="Zeit", value=_timestamp(), inline=True)
-        await self.send_log(guild, "message", embed)
+        if await self.send_log(guild, "message", embed):
+            self._handled_delete_ids.add(payload.message_id)
+
+    @commands.Cog.listener()
+    async def on_message_delete(self, message: discord.Message) -> None:
+        """Fallback fuer geloeschte Nachrichten, die im Cache vorhanden waren."""
+        if message.guild is None or message.guild.id != GUILD_ID:
+            return
+        if message.id in self._handled_delete_ids:
+            return
+
+        embed = _embed("message", "Nachricht gelöscht")
+        embed.add_field(name="Autor", value=_user_lines(message.author), inline=True)
+        embed.add_field(name="Channel", value=message.channel.mention, inline=True)
+        embed.add_field(name="Ursprünglicher Inhalt", value=message.content[:1020] or "(leer)", inline=False)
+        embed.add_field(name="Nachricht", value=f"`{message.id}`", inline=True)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=True)
+        if await self.send_log(message.guild, "message", embed):
+            self._handled_delete_ids.add(message.id)
 
     @commands.Cog.listener()
     async def on_message_edit(
