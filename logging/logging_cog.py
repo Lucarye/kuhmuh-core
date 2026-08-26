@@ -67,6 +67,40 @@ def _changed_permissions(changes: list[tuple[str, str, str]]) -> str:
     return "\n".join(f"{label}: {before} → {after}" for label, before, after in changes)
 
 
+def _bool_state(value: bool) -> str:
+    return "✅" if value else "❌"
+
+
+PERMISSION_LABELS = {
+    "view_channel": "Kanal ansehen",
+    "send_messages": "Nachrichten senden",
+    "attach_files": "Dateien anhängen",
+    "add_reactions": "Reaktionen hinzufügen",
+    "connect": "Verbinden",
+    "manage_messages": "Nachrichten verwalten",
+    "mention_everyone": "Erwähnungen verwenden",
+}
+
+
+def _permission_label(name: str) -> str:
+    return PERMISSION_LABELS.get(name, name.replace("_", " ").capitalize())
+
+
+def _account_age(created_at: dt.datetime, now: dt.datetime | None = None) -> str:
+    reference = now or discord.utils.utcnow()
+    elapsed_days = max((reference - created_at).days, 0)
+    years, remaining_days = divmod(elapsed_days, 365)
+    months, days = divmod(remaining_days, 30)
+    parts = []
+    if years:
+        parts.append(f"{years} Jahr" if years == 1 else f"{years} Jahre")
+    if months:
+        parts.append(f"{months} Monat" if months == 1 else f"{months} Monate")
+    if days or not parts:
+        parts.append(f"{days} Tag" if days == 1 else f"{days} Tage")
+    return ", ".join(parts)
+
+
 def _embed(category: str, title: str, description: str = "") -> discord.Embed:
     embed = discord.Embed(
         title=title,
@@ -234,6 +268,26 @@ class LoggingCog(commands.Cog):
             return False
         return await self._send_category_embeds(guild, category, [embed])
 
+    async def _audit_actor(
+        self,
+        guild: discord.Guild,
+        action: discord.AuditLogAction,
+        target_id: int,
+        *,
+        max_age_seconds: int = 15,
+    ) -> discord.User | discord.Member | None:
+        now = discord.utils.utcnow()
+        try:
+            async for entry in guild.audit_logs(limit=10, action=action):
+                if entry.target is None or getattr(entry.target, "id", None) != target_id:
+                    continue
+                if (now - entry.created_at).total_seconds() > max_age_seconds:
+                    continue
+                return entry.user
+        except (discord.Forbidden, discord.HTTPException):
+            return None
+        return None
+
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent) -> None:
         """Loggt geloeschte Nachrichten, sofern der Message-Bereich konfiguriert ist."""
@@ -261,6 +315,12 @@ class LoggingCog(commands.Cog):
         embed.add_field(name="Channel", value=f"<#${payload.channel_id}>".replace("$", ""), inline=True)
         content = cached_message.content if cached_message is not None else "nicht verfügbar"
         embed.add_field(name="Ursprünglicher Inhalt", value=content[:1020] or "(leer)", inline=False)
+        if cached_message is not None and cached_message.attachments:
+            attachments = "\n".join(
+                f"`{attachment.filename}` ({attachment.url})"
+                for attachment in cached_message.attachments
+            )
+            embed.add_field(name="Anhänge", value=attachments[:1020], inline=False)
         embed.add_field(name="Nachricht", value=f"`{payload.message_id}`", inline=True)
         embed.add_field(name="Zeit", value=_timestamp(), inline=True)
         if await self.send_log(guild, "message", embed):
@@ -278,10 +338,60 @@ class LoggingCog(commands.Cog):
         embed.add_field(name="Autor", value=_user_lines(message.author), inline=True)
         embed.add_field(name="Channel", value=message.channel.mention, inline=True)
         embed.add_field(name="Ursprünglicher Inhalt", value=message.content[:1020] or "(leer)", inline=False)
+        if message.attachments:
+            attachments = "\n".join(
+                f"`{attachment.filename}` ({attachment.url})"
+                for attachment in message.attachments
+            )
+            embed.add_field(name="Anhänge", value=attachments[:1020], inline=False)
         embed.add_field(name="Nachricht", value=f"`{message.id}`", inline=True)
         embed.add_field(name="Zeit", value=_timestamp(), inline=True)
         if await self.send_log(message.guild, "message", embed):
             self._handled_delete_ids.add(message.id)
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent) -> None:
+        await self._log_reaction(payload, "Reaktion hinzugefügt")
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent) -> None:
+        await self._log_reaction(payload, "Reaktion entfernt")
+
+    async def _log_reaction(
+        self,
+        payload: discord.RawReactionActionEvent,
+        title: str,
+    ) -> None:
+        if payload.guild_id != GUILD_ID or payload.user_id == self.bot.user.id:
+            return
+        guild = self.bot.get_guild(GUILD_ID)
+        channel = guild.get_channel(payload.channel_id) if guild is not None else None
+        if guild is None or channel is None:
+            return
+        user = payload.member or self.bot.get_user(payload.user_id)
+        message = None
+        try:
+            message = await channel.fetch_message(payload.message_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+        if user is None:
+            user_text = f"<@{payload.user_id}>\nUnbekannter Nutzer · {payload.user_id}"
+        else:
+            user_text = _user_lines(user)
+        embed = _embed("message", title)
+        embed.add_field(name="Nutzer", value=user_text, inline=True)
+        embed.add_field(name="Emoji", value=str(payload.emoji), inline=True)
+        embed.add_field(name="Channel", value=channel.mention, inline=True)
+        message_url = f"https://discord.com/channels/{GUILD_ID}/{payload.channel_id}/{payload.message_id}"
+        embed.add_field(
+            name="Nachricht",
+            value=f"`{payload.message_id}`\n[Zur Nachricht]({message.jump_url if message else message_url})",
+            inline=False,
+        )
+        if message is not None:
+            embed.add_field(name="Nachrichtenautor", value=_user_lines(message.author), inline=False)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+        await self.send_log(guild, "message", embed)
 
     @commands.Cog.listener()
     async def on_message_edit(
@@ -324,6 +434,13 @@ class LoggingCog(commands.Cog):
             embed = _embed("member", title)
             embed.add_field(name="Mitglied", value=_user_lines(after), inline=False)
             embed.add_field(name="Rolle", value=role.mention, inline=True)
+            actor = await self._audit_actor(
+                after.guild,
+                discord.AuditLogAction.member_role_update,
+                after.id,
+            )
+            if actor is not None:
+                embed.add_field(name="Ausgeführt von", value=_user_lines(actor), inline=True)
             embed.add_field(name="Zeit", value=_timestamp(), inline=True)
             await self.send_log(after.guild, "member", embed)
 
@@ -332,6 +449,16 @@ class LoggingCog(commands.Cog):
             embed.add_field(name="Mitglied", value=_user_lines(after), inline=False)
             embed.add_field(name="Vorher", value=before.nick or "kein Nickname", inline=True)
             embed.add_field(name="Nachher", value=after.nick or "kein Nickname", inline=True)
+            embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+            await self.send_log(after.guild, "member", embed)
+
+        if before.premium_since != after.premium_since:
+            title = "Server-Boost gestartet" if after.premium_since else "Server-Boost beendet"
+            embed = _embed("member", title)
+            embed.add_field(name="Nutzer", value=_user_lines(after), inline=False)
+            embed.add_field(name="Boosts", value=str(after.guild.premium_subscription_count or 0), inline=True)
+            if after.guild.premium_tier:
+                embed.add_field(name="Boost-Level", value=str(after.guild.premium_tier), inline=True)
             embed.add_field(name="Zeit", value=_timestamp(), inline=False)
             await self.send_log(after.guild, "member", embed)
 
@@ -364,11 +491,10 @@ class LoggingCog(commands.Cog):
             embed.add_field(name=f"{label} vorher", value=old_value, inline=True)
             embed.add_field(name=f"{label} nachher", value=new_value, inline=True)
         if avatar_changed:
-            if before.avatar:
-                embed.set_image(url=before.avatar.url)
             if after.avatar:
+                embed.set_image(url=after.avatar.url)
                 embed.set_thumbnail(url=after.avatar.url)
-            embed.add_field(name="Avatar", value="Vorher: großes Bild · Nachher: Thumbnail", inline=False)
+            embed.add_field(name="Avatar", value="Neuer Avatar direkt im Embed", inline=False)
         embed.add_field(name="Zeit", value=_timestamp(), inline=False)
         await self.send_log(guild, "member", embed)
 
@@ -393,6 +519,98 @@ class LoggingCog(commands.Cog):
         await self.send_log(channel.guild, "server", embed)
 
     @commands.Cog.listener()
+    async def on_invite_create(self, invite: discord.Invite) -> None:
+        if invite.guild is None or invite.guild.id != GUILD_ID:
+            return
+        embed = _embed("server", "Einladung erstellt")
+        embed.add_field(name="Einladung", value=f"discord.gg/{invite.code}", inline=True)
+        if invite.channel is not None:
+            embed.add_field(name="Channel", value=invite.channel.mention, inline=True)
+        if invite.inviter is not None:
+            embed.add_field(name="Erstellt von", value=_user_lines(invite.inviter), inline=False)
+        if invite.max_uses:
+            embed.add_field(name="Maximale Nutzungen", value=str(invite.max_uses), inline=True)
+        if invite.max_age:
+            embed.add_field(name="Gültigkeit", value=f"{invite.max_age // 3600} Stunden", inline=True)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+        await self.send_log(invite.guild, "server", embed)
+
+    @commands.Cog.listener()
+    async def on_guild_role_create(self, role: discord.Role) -> None:
+        if role.guild.id != GUILD_ID:
+            return
+        embed = _embed("server", "Rolle erstellt")
+        embed.add_field(name="Rolle", value=role.mention, inline=True)
+        embed.add_field(name="Name", value=role.name, inline=True)
+        actor = await self._audit_actor(role.guild, discord.AuditLogAction.role_create, role.id)
+        if actor is not None:
+            embed.add_field(name="Erstellt von", value=_user_lines(actor), inline=False)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+        await self.send_log(role.guild, "server", embed)
+
+    @commands.Cog.listener()
+    async def on_guild_role_delete(self, role: discord.Role) -> None:
+        if role.guild.id != GUILD_ID:
+            return
+        embed = _embed("server", "Rolle gelöscht")
+        embed.add_field(name="Letzter Name", value=role.name, inline=True)
+        embed.add_field(name="Rollen-ID", value=f"`{role.id}`", inline=True)
+        actor = await self._audit_actor(role.guild, discord.AuditLogAction.role_delete, role.id)
+        if actor is not None:
+            embed.add_field(name="Gelöscht von", value=_user_lines(actor), inline=False)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+        await self.send_log(role.guild, "server", embed)
+
+    @commands.Cog.listener()
+    async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
+        if after.guild.id != GUILD_ID:
+            return
+        changes = []
+        if before.name != after.name:
+            changes.append(("Name", before.name, after.name))
+        if before.color != after.color:
+            changes.append(("Farbe", str(before.color), str(after.color)))
+        if before.position != after.position:
+            changes.append(("Position", str(before.position), str(after.position)))
+        if before.mentionable != after.mentionable:
+            changes.append(("Erwähnbar", _bool_state(before.mentionable), _bool_state(after.mentionable)))
+        if before.hoist != after.hoist:
+            changes.append(("Separat anzeigen", _bool_state(before.hoist), _bool_state(after.hoist)))
+        if before.permissions != after.permissions:
+            changes.extend(self._permission_changes(before.permissions, after.permissions))
+        if not changes:
+            return
+        embed = _embed("server", "Rolle geändert")
+        embed.add_field(name="Rolle", value=after.mention, inline=False)
+        embed.add_field(
+            name="Änderungen",
+            value="\n".join(f"{label}: {old} → {new}" for label, old, new in changes)[:1020],
+            inline=False,
+        )
+        actor = await self._audit_actor(after.guild, discord.AuditLogAction.role_update, after.id)
+        if actor is not None:
+            embed.add_field(name="Geändert von", value=_user_lines(actor), inline=True)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=True)
+        await self.send_log(after.guild, "server", embed)
+
+    @commands.Cog.listener()
+    async def on_invite_delete(self, invite: discord.Invite) -> None:
+        if invite.guild is None or invite.guild.id != GUILD_ID:
+            return
+        embed = _embed("server", "Einladung gelöscht")
+        embed.add_field(name="Einladung", value=f"discord.gg/{invite.code}", inline=True)
+        if invite.channel is not None:
+            embed.add_field(name="Channel", value=invite.channel.mention, inline=True)
+        if invite.inviter is not None:
+            embed.add_field(name="Ursprünglicher Ersteller", value=_user_lines(invite.inviter), inline=False)
+        if invite.max_uses:
+            embed.add_field(name="Nutzungslimit", value=str(invite.max_uses), inline=True)
+        if invite.max_age:
+            embed.add_field(name="Ablaufzeit", value=f"{invite.max_age // 3600} Stunden", inline=True)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+        await self.send_log(invite.guild, "server", embed)
+
+    @commands.Cog.listener()
     async def on_guild_channel_update(
         self,
         before: discord.abc.GuildChannel,
@@ -408,22 +626,39 @@ class LoggingCog(commands.Cog):
             embed.add_field(name="Zeit", value=_timestamp(), inline=False)
             await self.send_log(after.guild, "server", embed)
 
+        channel_changes = []
+        before_category = getattr(before.category, "name", None)
+        after_category = getattr(after.category, "name", None)
+        if before_category != after_category:
+            channel_changes.append(("Kategorie", before_category or "keine", after_category or "keine"))
+        if getattr(before, "topic", None) != getattr(after, "topic", None):
+            channel_changes.append(("Thema", before.topic or "leer", after.topic or "leer"))
+        if getattr(before, "slowmode_delay", 0) != getattr(after, "slowmode_delay", 0):
+            channel_changes.append(("Slowmode", f"{before.slowmode_delay} Sekunden", f"{after.slowmode_delay} Sekunden"))
+        if getattr(before, "nsfw", False) != getattr(after, "nsfw", False):
+            channel_changes.append(("NSFW", _bool_state(before.nsfw), _bool_state(after.nsfw)))
+        if channel_changes:
+            embed = _embed("server", "Channel geändert")
+            embed.add_field(name="Channel", value=after.mention, inline=False)
+            embed.add_field(
+                name="Änderungen",
+                value="\n".join(f"{label}: {old} → {new}" for label, old, new in channel_changes)[:1020],
+                inline=False,
+            )
+            actor = await self._audit_actor(after.guild, discord.AuditLogAction.channel_update, after.id)
+            if actor is not None:
+                embed.add_field(name="Geändert von", value=_user_lines(actor), inline=True)
+            embed.add_field(name="Zeit", value=_timestamp(), inline=True)
+            await self.send_log(after.guild, "server", embed)
+
         before_overwrites = getattr(before, "overwrites", {})
         after_overwrites = getattr(after, "overwrites", {})
         changes = []
-        permission_names = (
-            ("send_messages", "Nachrichten senden"),
-            ("attach_files", "Dateien anhängen"),
-            ("add_reactions", "Reaktionen hinzufügen"),
-        )
         for target in set(before_overwrites) | set(after_overwrites):
             old = before_overwrites.get(target, discord.PermissionOverwrite())
             new = after_overwrites.get(target, discord.PermissionOverwrite())
-            for permission_name, label in permission_names:
-                old_state = self._permission_state(old, permission_name)
-                new_state = self._permission_state(new, permission_name)
-                if old_state != new_state:
-                    changes.append((target, label, old_state, new_state))
+            for label, old_state, new_state in self._overwrite_changes(old, new):
+                changes.append((target, label, old_state, new_state))
         for target, label, old_state, new_state in changes:
             embed = _embed("server", "Channel-Rechte geändert")
             embed.add_field(name="Channel", value=after.mention, inline=True)
@@ -433,6 +668,9 @@ class LoggingCog(commands.Cog):
                 value=f"{label}: {old_state} → {new_state}",
                 inline=False,
             )
+            actor = await self._audit_actor(after.guild, discord.AuditLogAction.channel_update, after.id)
+            if actor is not None:
+                embed.add_field(name="Geändert von", value=_user_lines(actor), inline=True)
             embed.add_field(name="Zeit", value=_timestamp(), inline=False)
             await self.send_log(after.guild, "server", embed)
 
@@ -486,6 +724,7 @@ class LoggingCog(commands.Cog):
         embed = _embed("join_leave", "Mitglied beigetreten")
         embed.add_field(name="Nutzer", value=_user_lines(member), inline=False)
         embed.add_field(name="Account erstellt", value=_timestamp(member.created_at), inline=True)
+        embed.add_field(name="Account-Alter", value=_account_age(member.created_at), inline=True)
         embed.add_field(name="Server beigetreten", value=_timestamp(member.joined_at), inline=True)
         embed.add_field(name="Mitglieder", value=str(member.guild.member_count or "unbekannt"), inline=True)
         avatar = getattr(member, "display_avatar", None)
@@ -517,6 +756,38 @@ class LoggingCog(commands.Cog):
         if value is False:
             return "❌"
         return "➖"
+
+    @staticmethod
+    def _overwrite_changes(
+        before: discord.PermissionOverwrite,
+        after: discord.PermissionOverwrite,
+    ) -> list[tuple[str, str, str]]:
+        changes = []
+        for permission_name in discord.Permissions.VALID_FLAGS:
+            old_state = LoggingCog._permission_state(before, permission_name)
+            new_state = LoggingCog._permission_state(after, permission_name)
+            if old_state != new_state:
+                changes.append((_permission_label(permission_name), old_state, new_state))
+        return changes
+
+    @staticmethod
+    def _permission_changes(
+        before: discord.Permissions,
+        after: discord.Permissions,
+    ) -> list[tuple[str, str, str]]:
+        changes = []
+        for permission_name in discord.Permissions.VALID_FLAGS:
+            old_value = getattr(before, permission_name)
+            new_value = getattr(after, permission_name)
+            if old_value != new_value:
+                changes.append(
+                    (
+                        _permission_label(permission_name),
+                        _bool_state(old_value),
+                        _bool_state(new_value),
+                    )
+                )
+        return changes
 
     def _build_test_embeds(
         self,
