@@ -20,6 +20,11 @@ LOG_COLORS = {
     "join_leave": discord.Color.gold(),
 }
 
+EVENT_COLORS = {
+    "join": discord.Color.green(),
+    "leave": discord.Color.red(),
+}
+
 CATEGORY_CHOICES = [
     app_commands.Choice(name="Alle Bereiche", value="all"),
     app_commands.Choice(name="Message", value="message"),
@@ -101,11 +106,16 @@ def _account_age(created_at: dt.datetime, now: dt.datetime | None = None) -> str
     return ", ".join(parts)
 
 
-def _embed(category: str, title: str, description: str = "") -> discord.Embed:
+def _embed(
+    category: str,
+    title: str,
+    description: str = "",
+    event: str | None = None,
+) -> discord.Embed:
     embed = discord.Embed(
         title=title,
         description=description or None,
-        color=LOG_COLORS[category],
+        color=EVENT_COLORS.get(event, LOG_COLORS[category]),
         timestamp=discord.utils.utcnow(),
     )
     embed.set_footer(text=f"Kuhmuh V2 · {category.replace('_', ' ').title()}")
@@ -685,14 +695,18 @@ class LoggingCog(commands.Cog):
             return
         title = None
         details = []
+        event = None
         if before.channel != after.channel:
             if before.channel is None:
                 title, details = "Voice-Channel beigetreten", [("Channel", after.channel.mention)]
+                event = "join"
             elif after.channel is None:
                 title, details = "Voice-Channel verlassen", [("Channel", before.channel.mention)]
+                event = "leave"
             else:
                 title = "Voice-Channel gewechselt"
                 details = [("Vorher", before.channel.mention), ("Nachher", after.channel.mention)]
+                event = None
         else:
             state_labels = (
                 ("self_mute", "Self Mute"),
@@ -710,7 +724,7 @@ class LoggingCog(commands.Cog):
                     break
         if title is None:
             return
-        embed = _embed("voice", title)
+        embed = _embed("voice", title, event=event)
         embed.add_field(name="Mitglied", value=_user_lines(member), inline=False)
         for label, value in details:
             embed.add_field(name=label, value=value, inline=True)
@@ -721,7 +735,7 @@ class LoggingCog(commands.Cog):
     async def on_member_join(self, member: discord.Member) -> None:
         if member.guild.id != GUILD_ID:
             return
-        embed = _embed("join_leave", "Mitglied beigetreten")
+        embed = _embed("join_leave", "Mitglied beigetreten", event="join")
         embed.add_field(name="Nutzer", value=_user_lines(member), inline=False)
         embed.add_field(name="Account erstellt", value=_timestamp(member.created_at), inline=True)
         embed.add_field(name="Account-Alter", value=_account_age(member.created_at), inline=True)
@@ -737,7 +751,7 @@ class LoggingCog(commands.Cog):
         if member.guild.id != GUILD_ID:
             return
         left_at = discord.utils.utcnow()
-        embed = _embed("join_leave", "Mitglied verlassen")
+        embed = _embed("join_leave", "Mitglied verlassen", event="leave")
         embed.add_field(name="Letzter Nutzer", value=_user_lines(member), inline=False)
         embed.add_field(name="Server beigetreten", value=_timestamp(member.joined_at), inline=True)
         embed.add_field(name="Server verlassen", value=_timestamp(left_at), inline=True)
@@ -854,7 +868,12 @@ class LoggingCog(commands.Cog):
         now = discord.utils.utcnow()
         account_created = now - dt.timedelta(days=420)
         joined = now - dt.timedelta(days=37, hours=4)
-        join = _embed("join_leave", "Mitglied beigetreten", "Beispiel fuer den spaeteren Join-Log.")
+        join = _embed(
+            "join_leave",
+            "Mitglied beigetreten",
+            "Beispiel fuer den spaeteren Join-Log.",
+            event="join",
+        )
         join.add_field(name="Nutzer", value=_user_lines(interaction.user), inline=False)
         join.add_field(name="Account erstellt", value=_timestamp(account_created), inline=True)
         join.add_field(name="Server beigetreten", value=_timestamp(joined), inline=True)
@@ -865,7 +884,12 @@ class LoggingCog(commands.Cog):
         if avatar:
             join.set_thumbnail(url=avatar.url)
 
-        leave = _embed("join_leave", "Mitglied verlassen", "Beispiel fuer den spaeteren Leave-Log.")
+        leave = _embed(
+            "join_leave",
+            "Mitglied verlassen",
+            "Beispiel fuer den spaeteren Leave-Log.",
+            event="leave",
+        )
         leave.add_field(name="Letzter Nutzername", value=_user_lines(interaction.user), inline=False)
         leave.add_field(name="Beigetreten", value=_timestamp(joined), inline=True)
         leave.add_field(name="Verlassen", value=_timestamp(now), inline=True)
