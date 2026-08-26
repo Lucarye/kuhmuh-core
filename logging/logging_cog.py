@@ -327,6 +327,72 @@ class LoggingCog(commands.Cog):
             embed.add_field(name="Zeit", value=_timestamp(), inline=True)
             await self.send_log(after.guild, "member", embed)
 
+        if before.nick != after.nick:
+            embed = _embed("member", "Server-Nickname geändert")
+            embed.add_field(name="Mitglied", value=_user_lines(after), inline=False)
+            embed.add_field(name="Vorher", value=before.nick or "kein Nickname", inline=True)
+            embed.add_field(name="Nachher", value=after.nick or "kein Nickname", inline=True)
+            embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+            await self.send_log(after.guild, "member", embed)
+
+    @commands.Cog.listener()
+    async def on_user_update(self, before: discord.User, after: discord.User) -> None:
+        name_changed = before.name != after.name
+        global_name_changed = before.global_name != after.global_name
+        avatar_changed = before.avatar != after.avatar
+        if not (name_changed or global_name_changed or avatar_changed):
+            return
+        guild = self.bot.get_guild(GUILD_ID)
+        member = guild.get_member(after.id) if guild is not None else None
+        if guild is None or member is None:
+            return
+
+        changed_values = []
+        if name_changed:
+            changed_values.append(("Discord-Username", before.name, after.name))
+        if global_name_changed:
+            changed_values.append(
+                (
+                    "Globaler Anzeigename",
+                    before.global_name or "nicht gesetzt",
+                    after.global_name or "nicht gesetzt",
+                )
+            )
+        if avatar_changed:
+            before_avatar = before.avatar.url if before.avatar else "kein Avatar"
+            after_avatar = after.avatar.url if after.avatar else "kein Avatar"
+            changed_values.append(("Avatar", before_avatar, after_avatar))
+
+        embed = _embed("member", "Discord-Profil geändert")
+        embed.add_field(name="Mitglied", value=_user_lines(after), inline=False)
+        for label, old_value, new_value in changed_values:
+            embed.add_field(name=f"{label} vorher", value=old_value, inline=True)
+            embed.add_field(name=f"{label} nachher", value=new_value, inline=True)
+        if avatar_changed and after.avatar:
+            embed.set_thumbnail(url=after.avatar.url)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+        await self.send_log(guild, "member", embed)
+
+    @commands.Cog.listener()
+    async def on_guild_channel_create(self, channel: discord.abc.GuildChannel) -> None:
+        if channel.guild.id != GUILD_ID:
+            return
+        embed = _embed("server", "Channel erstellt")
+        embed.add_field(name="Channel", value=channel.mention, inline=True)
+        embed.add_field(name="Name", value=channel.name, inline=True)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+        await self.send_log(channel.guild, "server", embed)
+
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel) -> None:
+        if channel.guild.id != GUILD_ID:
+            return
+        embed = _embed("server", "Channel gelöscht")
+        embed.add_field(name="Letzter Name", value=channel.name, inline=True)
+        embed.add_field(name="Channel-ID", value=f"`{channel.id}`", inline=True)
+        embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+        await self.send_log(channel.guild, "server", embed)
+
     @commands.Cog.listener()
     async def on_guild_channel_update(
         self,
@@ -335,6 +401,14 @@ class LoggingCog(commands.Cog):
     ) -> None:
         if after.guild.id != GUILD_ID:
             return
+        if before.name != after.name:
+            embed = _embed("server", "Channel umbenannt")
+            embed.add_field(name="Channel", value=after.mention, inline=False)
+            embed.add_field(name="Vorher", value=before.name, inline=True)
+            embed.add_field(name="Nachher", value=after.name, inline=True)
+            embed.add_field(name="Zeit", value=_timestamp(), inline=False)
+            await self.send_log(after.guild, "server", embed)
+
         before_overwrites = getattr(before, "overwrites", {})
         after_overwrites = getattr(after, "overwrites", {})
         changes = []
