@@ -1,0 +1,18 @@
+{
+    "name": "logging",
+    "short": "Visuelles Logging-Grundgeruest fuer Kuhmuh V2.",
+    "description": "Test-Embeds fuer die fuenf geplanten Discord-Logging-Bereiche.",
+    "end_user_data_statement": "Dieses Cog speichert keine Benutzerdaten.",
+    "install_msg": "Das Logging-Grundgeruest wurde geladen.",
+    "author": [
+        "Kuhmuh"
+    ],
+    "required_cogs": {},
+    "requirements": [],
+    "tags": [
+        "logging",
+        "kuhmuh",
+        "v2"
+    ],
+    "min_bot_version": "0.0.0"
+}
