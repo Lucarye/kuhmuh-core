@@ -47,7 +47,7 @@ class StoredCogSelect(discord.ui.Select):
             disabled=not options,
             min_values=1,
             max_values=1,
-            custom_id=f"kuhmuhupdate_select:{operation}",
+            custom_id=f"kuhmuhupdate_v2_select:{operation}",
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
@@ -97,7 +97,7 @@ class KuhmuhUpdateV2(commands.Cog):
     async def build_embed(self, _interaction: discord.Interaction) -> discord.Embed:
         await self.refresh_cache()
         embed = discord.Embed(
-            title="KuhmuhUpdate",
+            title="KuhmuhUpdate V2",
             description="Cogs aktualisieren und verwalten.",
             color=discord.Color.orange(),
         )
@@ -144,13 +144,13 @@ class KuhmuhUpdateV2(commands.Cog):
             return
         await interaction.response.edit_message(
             embed=await self.build_embed(interaction),
-            view=self.admin_hub.build_panel_view("kuhmuhupdate"),
+            view=self.admin_hub.build_panel_view("kuhmuhupdate_v2"),
         )
 
     def get_admin_panel(self) -> AdminPanel:
         return AdminPanel(
-            key="kuhmuhupdate",
-            label="KuhmuhUpdate",
+            key="kuhmuhupdate_v2",
+            label="KuhmuhUpdate V2",
             description="Cogs nach Repository-Änderungen aktualisieren.",
             build_embed=self.build_embed,
             commands=(

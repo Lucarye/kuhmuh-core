@@ -1,7 +1,7 @@
 from redbot.core.bot import Red
 from redbot.core.utils import get_end_user_data_statement_or_raise
 
-from .kuhmuhupdate import KuhmuhUpdateV2
+from .kuhmuhupdate_v2 import KuhmuhUpdateV2
 
 __red_end_user_data_statement__ = get_end_user_data_statement_or_raise(__file__)
 

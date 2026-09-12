@@ -12,7 +12,7 @@ from discord.ext.commands.view import StringView
 from redbot.core import Config
 
 
-LOG = logging.getLogger("red.kuhmuh.adminhub.kuhmuhupdate")
+LOG = logging.getLogger("red.kuhmuh.adminhub.kuhmuhupdate_v2")
 CONFIG_IDENTIFIER = 946102221
 
 
@@ -140,9 +140,9 @@ class KuhmuhUpdateService:
             )
             return
 
-        if selected["cog_name"].strip().casefold() == "kuhmuhupdate":
+        if selected["cog_name"].strip().casefold() in {"kuhmuhupdate", "adminupdate", "kuhmuhupdate_v2"}:
             await interaction.response.send_message(
-                "KuhmuhUpdate kann nicht über sich selbst aktualisiert werden.",
+            "Das Update-Modul kann nicht über sich selbst aktualisiert werden.",
                 ephemeral=True,
             )
             return
