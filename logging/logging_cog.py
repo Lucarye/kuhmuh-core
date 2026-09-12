@@ -341,6 +341,9 @@ class LoggingCog(commands.Cog):
         """Fallback fuer geloeschte Nachrichten, die im Cache vorhanden waren."""
         if message.guild is None or message.guild.id != GUILD_ID:
             return
+        channels = await self.config.guild(message.guild).channels()
+        if message.channel.id == channels.get("message", 0):
+            return
         if message.id in self._handled_delete_ids:
             return
 
