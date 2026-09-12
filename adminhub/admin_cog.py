@@ -8,7 +8,7 @@ from discord import app_commands
 from redbot.core import Config, commands
 
 from .registry import AdminPanelRegistry
-from .views.main_menu import AdminHubView
+from .views.main_menu import AdminHubView, AdminPanelView
 
 GUILD_ID = 1198649628787212458
 OWNER_ID = 359447597427064833
@@ -45,6 +45,16 @@ class AdminHubCog(commands.Cog):
             self.bot.add_view(AdminHubView(self))
         with contextlib.suppress(Exception):
             await self.bot.tree.sync(guild=discord.Object(id=GUILD_ID))
+
+    def register_panel(self, panel) -> None:
+        """Registriert ein ausdrücklich freigegebenes Admin-Panel."""
+        self.registry.register(panel)
+
+    def build_panel_view(self, key: str) -> AdminPanelView | None:
+        panel = self.registry.get(key)
+        if panel is None:
+            return None
+        return AdminPanelView(self, panel)
 
     def cog_unload(self) -> None:
         if self._startup_task and not self._startup_task.done():

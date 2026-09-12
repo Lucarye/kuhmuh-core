@@ -1,0 +1,14 @@
+{
+  "name": "kuhmuhupdate_v2",
+  "short": "Administratives Update-Modul für den V2-Admin-Hub.",
+  "description": "Führt Cog-Updates aus dem zentralen Admin-Hub aus. Es werden keine zusätzlichen Slash- oder Prefix-Commands registriert.",
+  "install_msg": "KuhmuhUpdate V2 wurde geladen und im Admin-Hub registriert.",
+  "author": ["Kuhmuh"],
+  "tags": ["admin", "update", "adminhub", "v2"],
+  "requirements": [],
+  "min_bot_version": "3.5.0",
+  "hidden": false,
+  "disabled": false,
+  "type": "COG",
+  "end_user_data_statement": "Speichert global die vom Administrator hinterlegten Cog- und Repository-Namen für Update-Aktionen."
+}
