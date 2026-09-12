@@ -9,7 +9,6 @@ from redbot.core import Config, commands
 
 from .registry import AdminPanelRegistry
 from .views.main_menu import AdminHubView
-from .modules.update_panel import UpdatePanel
 
 GUILD_ID = 1198649628787212458
 OWNER_ID = 359447597427064833
@@ -43,8 +42,6 @@ class AdminHubCog(commands.Cog):
         self.config = Config.get_conf(self, identifier=0x4B55484D41444D31, force_registration=True)
         self.config.register_guild(**DEFAULT_GUILD)
         self.registry = AdminPanelRegistry()
-        self.update_panel = UpdatePanel(bot)
-        self.registry.register(self.update_panel.panel)
         self._startup_task = self.bot.loop.create_task(self._startup_guild_sync())
 
     async def _startup_guild_sync(self) -> None:
