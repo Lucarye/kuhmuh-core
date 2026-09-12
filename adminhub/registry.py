@@ -8,6 +8,7 @@ import discord
 
 PanelPermissionCheck = Callable[[discord.Interaction], Union[bool, Awaitable[bool]]]
 PanelEmbedBuilder = Callable[[discord.Interaction], Union[discord.Embed, Awaitable[discord.Embed]]]
+PanelViewBuilder = Callable[[discord.Interaction], Union[discord.ui.View | None, Awaitable[discord.ui.View | None]]]
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class AdminPanel:
     label: str
     description: str
     build_embed: PanelEmbedBuilder
+    build_view: PanelViewBuilder | None = None
     required_check: PanelPermissionCheck | None = None
 
 

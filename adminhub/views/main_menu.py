@@ -46,11 +46,28 @@ class AdminHubSelect(discord.ui.Select):
             )
             return
 
+        if panel.required_check is not None:
+            allowed = panel.required_check(interaction)
+            if hasattr(allowed, "__await__"):
+                allowed = await allowed
+            if not allowed:
+                await interaction.response.send_message(
+                    "Dafür fehlen dir die erforderlichen Berechtigungen.",
+                    ephemeral=True,
+                )
+                return
+
         embed = panel.build_embed(interaction)
         if hasattr(embed, "__await__"):
             embed = await embed  # type: ignore[assignment]
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        view = None
+        if panel.build_view is not None:
+            view = panel.build_view(interaction)
+            if hasattr(view, "__await__"):
+                view = await view
+
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 class AdminHubView(discord.ui.View):
