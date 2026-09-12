@@ -76,6 +76,29 @@ def _bool_state(value: bool) -> str:
     return "✅" if value else "❌"
 
 
+def _deleted_message_content(message: discord.Message | None) -> str:
+    if message is None:
+        return "nicht verfügbar"
+
+    content_parts = [message.content] if message.content else []
+    for embed_index, message_embed in enumerate(message.embeds, start=1):
+        embed_parts = []
+        if message_embed.title:
+            embed_parts.append(f"Titel: {message_embed.title}")
+        if message_embed.description:
+            embed_parts.append(f"Beschreibung: {message_embed.description}")
+        if message_embed.url:
+            embed_parts.append(f"URL: {message_embed.url}")
+        for field in message_embed.fields:
+            embed_parts.append(f"{field.name}: {field.value}")
+        content_parts.append(
+            f"Embed {embed_index}: "
+            + " | ".join(embed_parts or ["ohne Textinhalt"])
+        )
+
+    return "\n".join(content_parts)[:1020] or "(leer)"
+
+
 PERMISSION_LABELS = {
     "view_channel": "Kanal ansehen",
     "send_messages": "Nachrichten senden",
@@ -323,8 +346,11 @@ class LoggingCog(commands.Cog):
         else:
             embed.add_field(name="Autor", value="nicht verfügbar (Nachricht nicht im Cache)", inline=True)
         embed.add_field(name="Channel", value=f"<#${payload.channel_id}>".replace("$", ""), inline=True)
-        content = cached_message.content if cached_message is not None else "nicht verfügbar"
-        embed.add_field(name="Ursprünglicher Inhalt", value=content[:1020] or "(leer)", inline=False)
+        embed.add_field(
+            name="Ursprünglicher Inhalt",
+            value=_deleted_message_content(cached_message),
+            inline=False,
+        )
         if cached_message is not None and cached_message.attachments:
             attachments = "\n".join(
                 f"`{attachment.filename}` ({attachment.url})"
@@ -350,7 +376,11 @@ class LoggingCog(commands.Cog):
         embed = _embed("message", "Nachricht gelöscht")
         embed.add_field(name="Autor", value=_user_lines(message.author), inline=True)
         embed.add_field(name="Channel", value=message.channel.mention, inline=True)
-        embed.add_field(name="Ursprünglicher Inhalt", value=message.content[:1020] or "(leer)", inline=False)
+        embed.add_field(
+            name="Ursprünglicher Inhalt",
+            value=_deleted_message_content(message),
+            inline=False,
+        )
         if message.attachments:
             attachments = "\n".join(
                 f"`{attachment.filename}` ({attachment.url})"
