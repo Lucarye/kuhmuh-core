@@ -1,0 +1,18 @@
+{
+    "name": "adminhub",
+    "short": "Zentraler Admin-Hub fuer Kuhmuh V2.",
+    "description": "Buendelt administrative Kuhmuh-Module hinter einem einzelnen Einstiegspunkt (/admin) mit dauerhaftem Panel. Enthaelt noch keine migrierten Module.",
+    "end_user_data_statement": "Speichert pro Guild lediglich Channel- und Nachrichten-ID des Admin-Panels.",
+    "install_msg": "Der Kuhmuh Admin-Hub wurde geladen. Nutze /admin, um das Panel zu posten.",
+    "author": [
+        "Kuhmuh"
+    ],
+    "required_cogs": {},
+    "requirements": [],
+    "tags": [
+        "admin",
+        "kuhmuh",
+        "v2"
+    ],
+    "min_bot_version": "0.0.0"
+}
