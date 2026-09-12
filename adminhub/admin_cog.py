@@ -22,12 +22,6 @@ DEFAULT_GUILD = {
     "panel_message_id": None,
 }
 
-ACTION_CHOICES = [
-    app_commands.Choice(name="Posten / Verschieben", value="post"),
-    app_commands.Choice(name="Refresh", value="refresh"),
-]
-
-
 class AdminHubCog(commands.Cog):
     """
     Zentraler Einstiegspunkt fuer administrative Kuhmuh-Module (V2).
@@ -93,13 +87,10 @@ class AdminHubCog(commands.Cog):
     # Slash Command
     # -------------------------
     @app_commands.guilds(discord.Object(id=GUILD_ID))
-    @app_commands.command(name="admin", description="Oeffnet bzw. aktualisiert das Kuhmuh Admin-Panel.")
-    @app_commands.describe(aktion="Posten/Verschieben oder Refresh")
-    @app_commands.choices(aktion=ACTION_CHOICES)
+    @app_commands.command(name="admin", description="Postet das Kuhmuh Admin-Panel in diesen Kanal.")
     async def admin_command(
         self,
         interaction: discord.Interaction,
-        aktion: app_commands.Choice[str],
     ) -> None:
         if interaction.guild is None or interaction.guild.id != GUILD_ID:
             await interaction.response.send_message(
@@ -117,15 +108,12 @@ class AdminHubCog(commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
 
-        if aktion.value == "post":
-            await self._post_or_move_panel(interaction)
-        else:
-            await self._refresh_panel(interaction)
+        await self._post_panel_here(interaction)
 
     # -------------------------
-    # Panel: Posten / Verschieben
+    # Panel: Neu posten
     # -------------------------
-    async def _post_or_move_panel(self, interaction: discord.Interaction) -> None:
+    async def _post_panel_here(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
         channel = interaction.channel
         if guild is None or not isinstance(channel, discord.TextChannel):
@@ -140,59 +128,20 @@ class AdminHubCog(commands.Cog):
 
         channel_id = await self.config.guild(guild).panel_channel_id()
         message_id = await self.config.guild(guild).panel_message_id()
+        old_message = None
 
         if channel_id and message_id:
             old_channel = guild.get_channel(int(channel_id))
-
-            if isinstance(old_channel, discord.TextChannel) and old_channel.id != channel.id:
+            if isinstance(old_channel, discord.TextChannel):
                 with contextlib.suppress(Exception):
                     old_message = await old_channel.fetch_message(int(message_id))
-                    await old_message.delete()
-            elif isinstance(old_channel, discord.TextChannel):
-                try:
-                    message = await old_channel.fetch_message(int(message_id))
-                    await message.edit(embed=embed, view=view)
-                    await interaction.followup.send("Admin-Panel aktualisiert.", ephemeral=True)
-                    return
-                except Exception:
-                    pass
 
         new_message = await channel.send(embed=embed, view=view)
+
+        if old_message is not None and old_message.id != new_message.id:
+            with contextlib.suppress(Exception):
+                await old_message.delete()
+
         await self.config.guild(guild).panel_channel_id.set(channel.id)
         await self.config.guild(guild).panel_message_id.set(new_message.id)
-        await interaction.followup.send("Admin-Panel gepostet.", ephemeral=True)
-
-    # -------------------------
-    # Panel: Refresh
-    # -------------------------
-    async def _refresh_panel(self, interaction: discord.Interaction) -> None:
-        guild = interaction.guild
-        if guild is None:
-            return
-
-        channel_id = await self.config.guild(guild).panel_channel_id()
-        message_id = await self.config.guild(guild).panel_message_id()
-        if not channel_id or not message_id:
-            await interaction.followup.send(
-                "Es ist noch kein Admin-Panel gepostet. Nutze zuerst `Posten / Verschieben`.",
-                ephemeral=True,
-            )
-            return
-
-        channel = guild.get_channel(int(channel_id))
-        if not isinstance(channel, discord.TextChannel):
-            await interaction.followup.send(
-                "Der gespeicherte Panel-Channel ist nicht mehr verfuegbar.",
-                ephemeral=True,
-            )
-            return
-
-        try:
-            message = await channel.fetch_message(int(message_id))
-            await message.edit(embed=self.build_main_embed(), view=AdminHubView(self))
-            await interaction.followup.send("Admin-Panel aktualisiert.", ephemeral=True)
-        except Exception:
-            await interaction.followup.send(
-                "Das Admin-Panel konnte nicht aktualisiert werden.",
-                ephemeral=True,
-            )
+        await interaction.followup.send("Admin-Panel hier neu gepostet.", ephemeral=True)
