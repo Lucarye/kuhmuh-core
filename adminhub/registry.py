@@ -8,7 +8,27 @@ import discord
 
 PanelPermissionCheck = Callable[[discord.Interaction], Union[bool, Awaitable[bool]]]
 PanelEmbedBuilder = Callable[[discord.Interaction], Union[discord.Embed, Awaitable[discord.Embed]]]
-PanelViewBuilder = Callable[[discord.Interaction], Union[discord.ui.View | None, Awaitable[discord.ui.View | None]]]
+PanelActionCallback = Callable[[discord.Interaction], Awaitable[None]]
+
+
+@dataclass(frozen=True)
+class AdminCommandInfo:
+    """Dokumentiert eine Funktion, ohne einen Discord-Command zu registrieren."""
+
+    name: str
+    description: str
+    usage: str = ""
+
+
+@dataclass(frozen=True)
+class AdminAction:
+    """Eine sichtbare Aktion auf der Seite eines Admin-Cogs."""
+
+    key: str
+    label: str
+    description: str
+    callback: PanelActionCallback
+    required_check: PanelPermissionCheck | None = None
 
 
 @dataclass(frozen=True)
@@ -26,7 +46,8 @@ class AdminPanel:
     label: str
     description: str
     build_embed: PanelEmbedBuilder
-    build_view: PanelViewBuilder | None = None
+    commands: tuple[AdminCommandInfo, ...] = ()
+    actions: tuple[AdminAction, ...] = ()
     required_check: PanelPermissionCheck | None = None
 
 
