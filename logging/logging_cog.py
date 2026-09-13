@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 
 import discord
 from redbot.core import Config, app_commands, commands
@@ -40,10 +41,12 @@ ACTION_CHOICES = [
     app_commands.Choice(name="Bereich deaktivieren", value="disable"),
     app_commands.Choice(name="Zielchannel zurücksetzen", value="reset"),
     app_commands.Choice(name="Beispiel ausgeben", value="preview"),
+    app_commands.Choice(name="Nicknames nachtragen", value="backfill_nicknames"),
 ]
 
 LOG_CATEGORIES = ("message", "member", "server", "voice", "join_leave")
 DEFAULT_GUILD = {"channels": {category: 0 for category in LOG_CATEGORIES}}
+LOGGED_USER_PATTERN = re.compile(r"^<@!?(\d+)>\n.* · \1$", re.DOTALL)
 
 
 def _category_label(value: str) -> str:
@@ -60,8 +63,16 @@ def _timestamp(value: dt.datetime | None = None) -> str:
 
 def _user_lines(user: discord.abc.User) -> str:
     username = getattr(user, "name", "unbekannt")
+    nickname = getattr(user, "nick", None)
     identity = f"{username} · {user.id}"
+    if nickname:
+        identity = f"{nickname} · {identity}"
     return f"{user.mention}\n{identity}"
+
+
+def _logged_user_id(value: str) -> int | None:
+    match = LOGGED_USER_PATTERN.fullmatch(value)
+    return int(match.group(1)) if match else None
 
 
 def _channel_mention(channel: discord.abc.GuildChannel | discord.Thread | None) -> str:
@@ -196,6 +207,14 @@ class LoggingCog(commands.Cog):
             await self._show_configuration(interaction)
             return
 
+        if action.value == "backfill_nicknames":
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            updated_messages = await self._backfill_nicknames(interaction.guild)
+            await interaction.edit_original_response(
+                content=f"Nicknames wurden in {updated_messages} Log-Posts nachgetragen."
+            )
+            return
+
         if category is None:
             await interaction.response.send_message(
                 "Bitte waehle genau einen Logging-Bereich aus.", ephemeral=True
@@ -276,6 +295,70 @@ class LoggingCog(commands.Cog):
             target = f"<#{channel_id}>" if channel_id else "deaktiviert"
             embed.add_field(name=_category_label(category), value=target, inline=True)
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    async def _backfill_nicknames(self, guild: discord.Guild) -> int:
+        bot_user = self.bot.user
+        if bot_user is None:
+            return 0
+
+        channel_ids = set((await self.config.guild(guild).channels()).values())
+        members: dict[int, discord.Member | None] = {}
+        updated_messages = 0
+
+        async def get_member(user_id: int) -> discord.Member | None:
+            if user_id not in members:
+                member = guild.get_member(user_id)
+                if member is None:
+                    try:
+                        member = await guild.fetch_member(user_id)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        pass
+                members[user_id] = member
+            return members[user_id]
+
+        for channel_id in channel_ids:
+            channel = guild.get_channel(channel_id)
+            if not isinstance(channel, discord.TextChannel):
+                continue
+            try:
+                async for message in channel.history(limit=None):
+                    if message.author.id != bot_user.id or not message.embeds:
+                        continue
+
+                    embeds = []
+                    message_changed = False
+                    for source_embed in message.embeds:
+                        embed = discord.Embed.from_dict(source_embed.to_dict())
+                        for index, field in enumerate(embed.fields):
+                            user_id = _logged_user_id(field.value)
+                            if user_id is None:
+                                continue
+                            member = await get_member(user_id)
+                            if member is None or not member.nick:
+                                continue
+                            user_lines = _user_lines(member)
+                            if field.value == user_lines:
+                                continue
+                            embed.set_field_at(
+                                index,
+                                name=field.name,
+                                value=user_lines,
+                                inline=field.inline,
+                            )
+                            message_changed = True
+                        embeds.append(embed)
+
+                    if not message_changed:
+                        continue
+                    try:
+                        await message.edit(embeds=embeds)
+                        updated_messages += 1
+                    except (discord.Forbidden, discord.HTTPException):
+                        continue
+            except (discord.Forbidden, discord.HTTPException):
+                continue
+
+        return updated_messages
 
     async def _send_category_embeds(
         self,
