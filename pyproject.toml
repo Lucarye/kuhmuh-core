@@ -1,0 +1,40 @@
+[project]
+name = "kuhmuh-core"
+version = "0.1.0"
+requires-python = "==3.11.*"
+dependencies = ["Red-DiscordBot==3.5.22"]
+
+[dependency-groups]
+dev = ["ruff", "pyrefly"]
+
+[tool.uv]
+package = false  # Red-Cogs, kein installierbares Paket
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "ASYNC",    # async pitfalls (blocking calls in coroutines)
+    "SIM",      # simplify
+    "RUF",      # ruff-specific
+]
+ignore = [
+    "E501",     # line length -> formatter
+    "RUF001",   # ambiguous unicode in strings (German text, emojis)
+    "RUF002",   # ... in docstrings
+    "RUF003",   # ... in comments
+]
+
+[tool.ruff.lint.isort]
+known-third-party = ["discord", "redbot"]
+
+[tool.pyrefly]
+python-version = "3.11"
+project-excludes = ["**/__pycache__", ".venv"]
