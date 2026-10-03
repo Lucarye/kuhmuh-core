@@ -71,8 +71,10 @@ Vor dem ersten Edit an einem neuen Cog fragen, ob er in den Admin-Hub soll. Antw
 
 ### Slash-Commands
 
-- Neue Commands: Guild-scoped, direkt am Cog definiert, kontrollierter Startup-Sync nur für die Ziel-Guild, Berechtigungs- und Guild-Prüfung, stabile Beschreibung und eindeutige Optionen.
-- Bestand mit `cog_load()` + `bot.tree.add_command()` ist Übergangscode – kein Anlass für Sofortumbau. Bei Änderungen prüfen: doppelte/globale Registrierung, Entfernen alter Commands bei Reload, Sync nur für Ziel-Guild, Auswirkung auf andere Repos.
+- Commands nur per Decorator am Cog (`@app_commands.guilds(...)` + `@app_commands.command(...)`): Guild-scoped, Berechtigungs- und Guild-Prüfung, stabile Beschreibung und eindeutige Optionen.
+- **Verboten in Cogs:** `bot.tree.sync()`, `clear_commands()`, `copy_global_to()`, manuelles `add_command()`/`remove_command()` – auch nicht in `cog_load()`, `cog_unload()` oder Startup-Tasks. Ein Guild-Sync überschreibt die komplette Command-Liste; fehlt ein Command im lokalen Tree, wird er gelöscht und mit neuer ID neu angelegt, die Berechtigungen aus den Server-Integrationen gehen verloren.
+- Sync nur manuell per `[p]slash sync <GUILD_ID>`, wenn sich Command-Definitionen geändert haben und alle Cogs geladen sind.
+- Name und Typ eines Commands sind stabil. Umbenennen/Entfernen löscht Berechtigungen dauerhaft und muss in `Änderungen.md` vermerkt werden.
 
 ### Ausgaben und Logging
 
