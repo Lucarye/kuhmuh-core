@@ -36,15 +36,13 @@ class AdminHubCog(commands.Cog):
         self.config = Config.get_conf(self, identifier=0x4B55484D41444D31, force_registration=True)
         self.config.register_guild(**DEFAULT_GUILD)
         self.registry = AdminPanelRegistry()
-        self._startup_task = self.bot.loop.create_task(self._startup_guild_sync())
+        self._startup_task = self.bot.loop.create_task(self._startup_register_view())
 
-    async def _startup_guild_sync(self) -> None:
+    async def _startup_register_view(self) -> None:
         await self.bot.wait_until_red_ready()
         await self.bot.wait_until_ready()
         with contextlib.suppress(Exception):
             self.bot.add_view(AdminHubView(self))
-        with contextlib.suppress(Exception):
-            await self.bot.tree.sync(guild=discord.Object(id=GUILD_ID))
 
     def register_panel(self, panel) -> None:
         """Registriert ein ausdrücklich freigegebenes Admin-Panel."""

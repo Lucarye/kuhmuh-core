@@ -17,3 +17,14 @@ Der gemeinsame Verlauf vor der Repo-Trennung steht weiterhin im Archiv unter [`.
 - AKTIV: Ruff-Konfiguration (py311, Zeilenlänge 100, Regeln E/W/F/I/B/UP/ASYNC/SIM/RUF) und Pyrefly-Konfiguration ergänzt. Keine Codeänderung; Befunde (75 Ruff, 40 Pyrefly) noch offen.
 - AKTIV: `AGENTS.md` (gelesen von GitHub Copilot) und `CLAUDE.md` (importiert `AGENTS.md`, gelesen von Claude Code) aus `V2 KUHMUH_RULEBOOK.md` und `V2 KUHMUH_WORKMODE.md` abgeleitet. Die Quelldokumente bleiben unverändert bestehen.
 - Validierung: `uv lock`, `uv sync`, `uv run ruff check --no-cache .` und `uv run pyrefly check` laufen; Inhaltsprüfung von `AGENTS.md` gegen die Quelldokumente.
+
+## 03.10.2026, 16:02:58 +02:00
+
+- AKTIV: Automatische Slash-Command-Syncs entfernt. Ursache: Jeder `tree.sync(guild=...)` überschreibt die komplette Guild-Command-Liste; fehlende Commands wurden gelöscht und mit neuer ID neu angelegt, wodurch die Berechtigungen aus den Server-Integrationen verloren gingen.
+  - `adminhub/admin_cog.py`: Sync aus dem Startup-Task entfernt, Task heißt jetzt `_startup_register_view` (registriert nur noch `AdminHubView`).
+  - `logging/logging_cog.py`: Startup-Task entfernt (enthielt nur den Sync).
+  - Command-Namen unverändert, keine Datenformatänderung.
+- AKTIV: `V2 KUHMUH_RULEBOOK.md` §4 und `AGENTS.md` (Slash-Commands) neu gefasst: kein Sync im Code, Sync nur manuell per `[p]slash sync <GUILD_ID>`, Command-Namen sind stabil.
+- Parallel in V1 (`kuhmuh-cogs`): Syncs in `export`, `gruppensuche`, `gruppensuche_test`, `gruppenübersicht` entfernt, `kuhmuhupdate` gelöscht.
+- Validierung: `uv run ruff check --no-cache --select F adminhub logging` ohne Befund; Grep über beide Repos findet keine `tree.sync`/`add_command`/`remove_command`-Aufrufe mehr.
+- Offen: Runtime nicht getestet. Nach Deploy einmalig `[p]slash sync <GUILD_ID>` mit allen geladenen Cogs, danach Command-IDs vor/nach Neustart vergleichen. Berechtigungen der zuletzt neu angelegten Commands einmalig neu setzen.

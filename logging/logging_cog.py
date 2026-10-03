@@ -164,12 +164,6 @@ class LoggingCog(commands.Cog):
         self.config = Config.get_conf(self, identifier=0x4B55484D554C4F47, force_registration=True)
         self.config.register_guild(**DEFAULT_GUILD)
         self._handled_delete_ids: set[int] = set()
-        self._startup_task = self.bot.loop.create_task(self._startup_guild_sync())
-
-    async def _startup_guild_sync(self) -> None:
-        await self.bot.wait_until_red_ready()
-        await self.bot.wait_until_ready()
-        await self.bot.tree.sync(guild=discord.Object(id=GUILD_ID))
 
     @app_commands.guilds(discord.Object(id=GUILD_ID))
     @app_commands.command(
