@@ -44,12 +44,13 @@ class SessionService:
         """
         Lädt die Session eines Nutzers, sofern vorhanden und nicht abgelaufen.
         """
-        session = self._session_repository.get(user_id, context)
+        guild_id = context.guild_id
+        session = self._session_repository.get(user_id, guild_id, context)
         if session is None:
             return None
 
         if session.is_expired():
-            self._session_repository.delete(user_id, context)
+            self._session_repository.delete(user_id, guild_id, context)
             return None
 
         return session
@@ -85,10 +86,18 @@ class SessionService:
         """
         Entfernt die Session eines Nutzers.
         """
-        return self._session_repository.delete(user_id, context)
+        guild_id = context.guild_id
+        return self._session_repository.delete(user_id, guild_id, context)
 
     def cleanup_expired_sessions(self, *, context: Context) -> list[FlowSession]:
         """
         Entfernt alle abgelaufenen Sessions eines Contexts.
         """
-        return self._session_repository.cleanup_expired(context)
+        expired = [
+            session
+            for session in self._session_repository.list_by_context(context)
+            if session.is_expired()
+        ]
+        for session in expired:
+            self._session_repository.delete(session.user_id, session.guild_id, context)
+        return expired

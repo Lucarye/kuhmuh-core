@@ -28,3 +28,11 @@ Der gemeinsame Verlauf vor der Repo-Trennung steht weiterhin im Archiv unter [`.
 - Parallel in V1 (`kuhmuh-cogs`): Syncs in `export`, `gruppensuche`, `gruppensuche_test`, `gruppenübersicht` entfernt, `kuhmuhupdate` gelöscht.
 - Validierung: `uv run ruff check --no-cache --select F adminhub logging` ohne Befund; Grep über beide Repos findet keine `tree.sync`/`add_command`/`remove_command`-Aufrufe mehr.
 - Offen: Runtime nicht getestet. Nach Deploy einmalig `[p]slash sync <GUILD_ID>` mit allen geladenen Cogs, danach Command-IDs vor/nach Neustart vergleichen. Berechtigungen der zuletzt neu angelegten Commands einmalig neu setzen.
+
+## 06.10.2026, 18:29:00 +02:00
+
+- AKTIV: `groupfinder/core/services/session_service.py`: Repository-Aufrufe korrigiert. `get()`/`delete()` erwarten `(user_id, guild_id, context)`, der Service übergab nur `(user_id, context)` → `TypeError` beim ersten Aufruf. Jetzt mit `context.guild_id`.
+- AKTIV: `cleanup_expired_sessions()` rief das nicht existierende `SessionRepository.cleanup_expired()` auf; jetzt über `list_by_context()` + `delete()` umgesetzt. Signatur und Rückgabe unverändert.
+- Laufzeit bisher nicht betroffen: `command_cog.py` instanziiert `SessionService`, ruft aber keine Methode auf. Keine Command- oder Datenformatänderung.
+- Validierung: `uv run ruff check` und `ruff format --check` ohne Befund; `uv run pyrefly check` 39 → 32 Fehler (alle 7 in `session_service.py` behoben); Verhaltenstest (anlegen, lesen, abgelaufene Session bereinigen, löschen) erfolgreich.
+- Offen: `groupfinder/core/routing/search_service.py` importiert nicht existierende Module aus `core/routing/` und wird nirgends importiert (Duplikat von `core/services/search_service.py`). Löschung vorgeschlagen, noch nicht durchgeführt.
