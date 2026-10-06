@@ -284,11 +284,12 @@ class PublicSearchView(discord.ui.View):
         """
         Aktualisiert die öffentliche Suchnachricht oder entfernt die View nach Löschung.
         """
-        if public_message_id is None or interaction.channel is None:
+        channel = interaction.channel
+        if public_message_id is None or not isinstance(channel, discord.abc.Messageable):
             return
 
         try:
-            public_message = await interaction.channel.fetch_message(public_message_id)
+            public_message = await channel.fetch_message(public_message_id)
         except discord.NotFound:
             return
 

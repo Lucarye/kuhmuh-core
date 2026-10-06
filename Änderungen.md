@@ -36,3 +36,14 @@ Der gemeinsame Verlauf vor der Repo-Trennung steht weiterhin im Archiv unter [`.
 - Laufzeit bisher nicht betroffen: `command_cog.py` instanziiert `SessionService`, ruft aber keine Methode auf. Keine Command- oder Datenformatänderung.
 - Validierung: `uv run ruff check` und `ruff format --check` ohne Befund; `uv run pyrefly check` 39 → 32 Fehler (alle 7 in `session_service.py` behoben); Verhaltenstest (anlegen, lesen, abgelaufene Session bereinigen, löschen) erfolgreich.
 - Offen: `groupfinder/core/routing/search_service.py` importiert nicht existierende Module aus `core/routing/` und wird nirgends importiert (Duplikat von `core/services/search_service.py`). Löschung vorgeschlagen, noch nicht durchgeführt.
+
+## 06.10.2026, 18:38:50 +02:00
+
+- AKTIV: `logging/logging_cog.py`, Typ-Absicherungen ohne fachliche Änderung:
+  - `_backfill_nicknames`: `_logged_user_id(field.value or "")`, da ein Embed-Feld ohne Wert sonst `re.fullmatch(None)` mit `TypeError` auslösen würde.
+  - Nachricht gelöscht/bearbeitet, Einladung erstellt/gelöscht: Channel-Feld als `<#{channel.id}>` statt `channel.mention`. Gleiche Ausgabe, funktioniert aber auch für `PartialMessageable` und `discord.Object`.
+  - `on_guild_channel_update`: `getattr`-Werte für Thema, Slowmode und NSFW in Variablen übernommen statt danach direkt auf das Attribut zuzugreifen (gleiches Muster wie bei der Kategorie).
+- AKTIV: `groupfinder/ui/views/public_views.py` `_refresh_public_message`: `isinstance(channel, discord.abc.Messageable)` statt `is None`, damit `fetch_message` nicht auf Kategorie- oder Forum-Channels aufgerufen wird.
+- Keine Command-, Logformat- oder Datenformatänderung.
+- Validierung: `uv run ruff check` und `ruff format --check` ohne Befund; `uv run pyrefly check` 32 → 20 Fehler (alle 12 betroffenen behoben).
+- Restunsicherheit: Kein Laufzeittest der Event-Listener; Gleichheit der Ausgabe per Inhaltsprüfung (`mention` ist bei Guild-Channels `<#id>`).

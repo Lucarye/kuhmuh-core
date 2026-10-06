@@ -326,7 +326,7 @@ class LoggingCog(commands.Cog):
                     for source_embed in message.embeds:
                         embed = discord.Embed.from_dict(source_embed.to_dict())
                         for index, field in enumerate(embed.fields):
-                            user_id = _logged_user_id(field.value)
+                            user_id = _logged_user_id(field.value or "")
                             if user_id is None:
                                 continue
                             member = await get_member(user_id)
@@ -458,7 +458,7 @@ class LoggingCog(commands.Cog):
 
         embed = _embed("message", "Nachricht gelöscht")
         embed.add_field(name="Autor", value=_user_lines(message.author), inline=True)
-        embed.add_field(name="Channel", value=message.channel.mention, inline=True)
+        embed.add_field(name="Channel", value=f"<#{message.channel.id}>", inline=True)
         embed.add_field(
             name="Ursprünglicher Inhalt",
             value=_deleted_message_content(message),
@@ -532,7 +532,7 @@ class LoggingCog(commands.Cog):
             return
         embed = _embed("message", "Nachricht bearbeitet")
         embed.add_field(name="Nutzer", value=_user_lines(after.author), inline=True)
-        embed.add_field(name="Channel", value=after.channel.mention, inline=True)
+        embed.add_field(name="Channel", value=f"<#{after.channel.id}>", inline=True)
         embed.add_field(
             name="Nachricht",
             value=f"`{after.id}`\n[Zur Nachricht]({after.jump_url})",
@@ -658,7 +658,7 @@ class LoggingCog(commands.Cog):
         embed = _embed("server", "Einladung erstellt")
         embed.add_field(name="Einladung", value=f"discord.gg/{invite.code}", inline=True)
         if invite.channel is not None:
-            embed.add_field(name="Channel", value=invite.channel.mention, inline=True)
+            embed.add_field(name="Channel", value=f"<#{invite.channel.id}>", inline=True)
         if invite.inviter is not None:
             embed.add_field(name="Erstellt von", value=_user_lines(invite.inviter), inline=False)
         if invite.max_uses:
@@ -739,7 +739,7 @@ class LoggingCog(commands.Cog):
         embed = _embed("server", "Einladung gelöscht")
         embed.add_field(name="Einladung", value=f"discord.gg/{invite.code}", inline=True)
         if invite.channel is not None:
-            embed.add_field(name="Channel", value=invite.channel.mention, inline=True)
+            embed.add_field(name="Channel", value=f"<#{invite.channel.id}>", inline=True)
         if invite.inviter is not None:
             embed.add_field(
                 name="Ursprünglicher Ersteller", value=_user_lines(invite.inviter), inline=False
@@ -776,18 +776,20 @@ class LoggingCog(commands.Cog):
             channel_changes.append(
                 ("Kategorie", before_category or "keine", after_category or "keine")
             )
-        if getattr(before, "topic", None) != getattr(after, "topic", None):
-            channel_changes.append(("Thema", before.topic or "leer", after.topic or "leer"))
-        if getattr(before, "slowmode_delay", 0) != getattr(after, "slowmode_delay", 0):
+        before_topic = getattr(before, "topic", None)
+        after_topic = getattr(after, "topic", None)
+        if before_topic != after_topic:
+            channel_changes.append(("Thema", before_topic or "leer", after_topic or "leer"))
+        before_slowmode = getattr(before, "slowmode_delay", 0)
+        after_slowmode = getattr(after, "slowmode_delay", 0)
+        if before_slowmode != after_slowmode:
             channel_changes.append(
-                (
-                    "Slowmode",
-                    f"{before.slowmode_delay} Sekunden",
-                    f"{after.slowmode_delay} Sekunden",
-                )
+                ("Slowmode", f"{before_slowmode} Sekunden", f"{after_slowmode} Sekunden")
             )
-        if getattr(before, "nsfw", False) != getattr(after, "nsfw", False):
-            channel_changes.append(("NSFW", _bool_state(before.nsfw), _bool_state(after.nsfw)))
+        before_nsfw = getattr(before, "nsfw", False)
+        after_nsfw = getattr(after, "nsfw", False)
+        if before_nsfw != after_nsfw:
+            channel_changes.append(("NSFW", _bool_state(before_nsfw), _bool_state(after_nsfw)))
         if channel_changes:
             embed = _embed("server", "Channel geändert")
             embed.add_field(name="Channel", value=after.mention, inline=False)
