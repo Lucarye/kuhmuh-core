@@ -19,7 +19,6 @@ from ..modules.groupfinder.module import GroupFinderModule
 from ..ui.renderers.search_renderer import SearchRenderer
 from ..ui.views.public_views import PublicSearchView
 
-
 GUILD_ID = LIVE_CONTEXT.guild_id
 
 
@@ -65,7 +64,9 @@ class GroupFinderCommandCog(commands.Cog):
         )
 
     @app_commands.guilds(discord.Object(id=GUILD_ID))
-    @app_commands.command(name="gruppensuche_v2", description="Erstellt eine neue Gruppensuche (V2).")
+    @app_commands.command(
+        name="gruppensuche_v2", description="Erstellt eine neue Gruppensuche (V2)."
+    )
     @app_commands.describe(
         content_key="Der Content-Typ der Suche.",
         slots="Anzahl der Gruppenplätze.",
@@ -94,8 +95,7 @@ class GroupFinderCommandCog(commands.Cog):
         if hasattr(interaction.user, "roles"):
             role_ids = [role.id for role in interaction.user.roles]
 
-        category_id = getattr(
-            getattr(interaction.channel, "category", None), "id", None)
+        category_id = getattr(getattr(interaction.channel, "category", None), "id", None)
 
         context = self.context_router.resolve(
             guild_id=interaction.guild.id,

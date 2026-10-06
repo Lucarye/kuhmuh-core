@@ -63,10 +63,7 @@ class SessionRepository:
         """
         namespace = self._get_namespace(context)
         bucket = self._storage.get(namespace, {})
-        return [
-            FlowSession.from_dict(session_data)
-            for session_data in bucket.values()
-        ]
+        return [FlowSession.from_dict(session_data) for session_data in bucket.values()]
 
     def clear_context(self, context: Context) -> None:
         """
@@ -81,10 +78,7 @@ class SessionRepository:
         """
         namespace = self._get_namespace(context)
         bucket = self._storage.get(namespace, {})
-        return {
-            session_key: dict(session_data)
-            for session_key, session_data in bucket.items()
-        }
+        return {session_key: dict(session_data) for session_key, session_data in bucket.items()}
 
     def import_context_data(
         self,
@@ -96,8 +90,7 @@ class SessionRepository:
         """
         namespace = self._get_namespace(context)
         self._storage[namespace] = {
-            str(session_key): dict(session_data)
-            for session_key, session_data in data.items()
+            str(session_key): dict(session_data) for session_key, session_data in data.items()
         }
 
     @staticmethod

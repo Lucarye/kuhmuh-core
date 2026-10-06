@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 
 @dataclass(slots=True, frozen=True)
 class _GuardKey:
     """Eindeutiger Schlüssel für eine geschützte Aktion."""
+
     action: str
     user_id: int
     target_id: str
@@ -38,14 +39,14 @@ class InteractionGuardService:
         if last_seen is None:
             return False
 
-        return datetime.now(timezone.utc) - last_seen < self._window
+        return datetime.now(UTC) - last_seen < self._window
 
     def mark(self, action: str, user_id: int, target_id: str) -> None:
         """
         Markiert eine Aktion als gerade ausgeführt.
         """
         key = _GuardKey(action=action, user_id=user_id, target_id=target_id)
-        self._entries[key] = datetime.now(timezone.utc)
+        self._entries[key] = datetime.now(UTC)
 
     def should_block_and_mark(self, action: str, user_id: int, target_id: str) -> bool:
         """
@@ -63,12 +64,10 @@ class InteractionGuardService:
         """
         Entfernt veraltete Guard-Einträge und gibt die Anzahl der entfernten Einträge zurück.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         expired_keys = [
-            key
-            for key, timestamp in self._entries.items()
-            if now - timestamp >= self._window
+            key for key, timestamp in self._entries.items() if now - timestamp >= self._window
         ]
 
         for key in expired_keys:

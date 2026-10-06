@@ -24,12 +24,8 @@ class SearchRenderer:
             payload=search.payload,
         )
 
-        participants = [
-            participant.display_name for participant in search.participants
-        ]
-        waitlist = [
-            participant.display_name for participant in search.waitlist
-        ]
+        participants = [participant.display_name for participant in search.participants]
+        waitlist = [participant.display_name for participant in search.waitlist]
 
         return {
             "search_id": search.search_id,

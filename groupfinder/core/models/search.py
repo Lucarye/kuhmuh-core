@@ -170,7 +170,7 @@ class Search:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Search":
+    def from_dict(cls, data: dict[str, Any]) -> Search:
         """
         Deserialisiert eine Suche aus einer Storage-Struktur.
 
@@ -186,14 +186,8 @@ class Search:
             creator_id=int(data.get("creator_id", 0)),
             status=str(data.get("status", "OPEN")),
             slots_total=int(data.get("slots_total", 0)),
-            participants=[
-                Participant.from_dict(item)
-                for item in data.get("participants", [])
-            ],
-            waitlist=[
-                Participant.from_dict(item)
-                for item in data.get("waitlist", [])
-            ],
+            participants=[Participant.from_dict(item) for item in data.get("participants", [])],
+            waitlist=[Participant.from_dict(item) for item in data.get("waitlist", [])],
             payload=dict(data.get("payload", {})),
             public_message_id=cls._optional_int(data.get("public_message_id")),
             dashboard_message_id=cls._optional_int(data.get("dashboard_message_id")),

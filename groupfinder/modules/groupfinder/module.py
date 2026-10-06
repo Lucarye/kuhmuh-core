@@ -49,9 +49,7 @@ class GroupFinderModule:
         """
         content_definition = self.get_content_definition(content_key)
         if content_definition is None:
-            return ValidationResult.fail(
-                f"Unbekannter Content-Typ: {content_key}"
-            )
+            return ValidationResult.fail(f"Unbekannter Content-Typ: {content_key}")
 
         return self._validator.validate_create_payload(
             content_definition=content_definition,

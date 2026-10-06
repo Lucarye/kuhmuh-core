@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -8,17 +8,14 @@ def utc_now() -> datetime:
     """
     Liefert die aktuelle Zeit als timezone-aware UTC datetime.
     """
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def datetime_to_storage(value: datetime) -> str:
     """
     Wandelt ein datetime in einen UTC-ISO-String für Storage um.
     """
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    else:
-        value = value.astimezone(timezone.utc)
+    value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
     return value.isoformat()
 
@@ -32,11 +29,11 @@ def datetime_from_storage(value: Any) -> datetime:
 
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
     parsed = datetime.fromisoformat(str(value))
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
+        return parsed.replace(tzinfo=UTC)
 
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)

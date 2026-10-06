@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass(slots=True)
@@ -14,7 +14,7 @@ class _TrackedLock:
     """
 
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    last_used_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_used_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class LockService:
@@ -39,7 +39,7 @@ class LockService:
                 tracked = _TrackedLock()
                 self._locks[search_id] = tracked
 
-            tracked.last_used_at = datetime.now(timezone.utc)
+            tracked.last_used_at = datetime.now(UTC)
             return tracked.lock
 
     async def cleanup_unused(self) -> int:
@@ -50,9 +50,7 @@ class LockService:
         """
         async with self._registry_lock:
             removable_keys = [
-                key
-                for key, tracked in self._locks.items()
-                if not tracked.lock.locked()
+                key for key, tracked in self._locks.items() if not tracked.lock.locked()
             ]
 
             for key in removable_keys:
@@ -65,4 +63,4 @@ class LockService:
         async with self._registry_lock:
             tracked = self._locks.get(search_id)
             if tracked is not None:
-                tracked.last_used_at = datetime.now(timezone.utc)
+                tracked.last_used_at = datetime.now(UTC)

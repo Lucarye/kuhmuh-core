@@ -11,7 +11,6 @@ from discord.ext import commands
 from discord.ext.commands.view import StringView
 from redbot.core import Config
 
-
 LOG = logging.getLogger("red.kuhmuh.adminhub.kuhmuhupdate_v2")
 CONFIG_IDENTIFIER = 946102221
 
@@ -50,7 +49,9 @@ class CommandOutputCatcher:
                 parts.append(str(message.content))
             for embed in message.embeds or []:
                 fields = "\n".join(f"{field.name}: {field.value}" for field in embed.fields)
-                chunk = "\n".join(value for value in (embed.title, embed.description, fields) if value)
+                chunk = "\n".join(
+                    value for value in (embed.title, embed.description, fields) if value
+                )
                 if chunk.strip():
                     parts.append(chunk.strip())
         return "\n".join(parts).strip()
@@ -100,7 +101,9 @@ class KuhmuhUpdateService:
         await self.config.stored_cogs.set(data)
         return True
 
-    async def invoke_prefix(self, interaction: discord.Interaction, command_name: str, arguments: str = "") -> tuple[bool, str]:
+    async def invoke_prefix(
+        self, interaction: discord.Interaction, command_name: str, arguments: str = ""
+    ) -> tuple[bool, str]:
         command = self.bot.get_command(command_name)
         if command is None:
             return False, f"Command nicht gefunden: {command_name}"
@@ -140,9 +143,13 @@ class KuhmuhUpdateService:
             )
             return
 
-        if selected["cog_name"].strip().casefold() in {"kuhmuhupdate", "adminupdate", "kuhmuhupdate_v2"}:
+        if selected["cog_name"].strip().casefold() in {
+            "kuhmuhupdate",
+            "adminupdate",
+            "kuhmuhupdate_v2",
+        }:
             await interaction.response.send_message(
-            "Das Update-Modul kann nicht über sich selbst aktualisiert werden.",
+                "Das Update-Modul kann nicht über sich selbst aktualisiert werden.",
                 ephemeral=True,
             )
             return
@@ -152,7 +159,9 @@ class KuhmuhUpdateService:
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("Bitte in einem Text-Channel ausführen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Bitte in einem Text-Channel ausführen.", ephemeral=True
+            )
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -206,7 +215,9 @@ class KuhmuhUpdateService:
             description=f"Repo: **{repo_name}**",
         )
         for result in results:
-            detail = next((line.strip() for line in result.details.splitlines() if line.strip()), "")
+            detail = next(
+                (line.strip() for line in result.details.splitlines() if line.strip()), ""
+            )
             if len(detail) > limit:
                 detail = detail[: max(0, limit - 1)] + "…"
             value = f"{result.status} {result.summary}"

@@ -25,9 +25,7 @@ class FlowSession:
     payload: dict[str, Any] = field(default_factory=dict)
 
     created_at: datetime = field(default_factory=utc_now)
-    expires_at: datetime = field(
-        default_factory=lambda: utc_now() + timedelta(minutes=15)
-    )
+    expires_at: datetime = field(default_factory=lambda: utc_now() + timedelta(minutes=15))
 
     def is_expired(self, now: datetime | None = None) -> bool:
         """Prüft, ob die Session bereits abgelaufen ist."""
@@ -64,7 +62,7 @@ class FlowSession:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "FlowSession":
+    def from_dict(cls, data: dict[str, Any]) -> FlowSession:
         """
         Deserialisiert eine Flow-Session aus einer Storage-Struktur.
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from ...definitions.base_definitions import ContentDefinition, FieldDefinition
 
-
 BDO_CONTENT_DEFINITIONS: dict[str, ContentDefinition] = {
     "bdo_spot": ContentDefinition(
         content_key="bdo_spot",

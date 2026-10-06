@@ -24,10 +24,7 @@ class SearchRepository:
         """
         namespace = self._get_namespace(context)
         bucket = self._storage.get(namespace, {})
-        return [
-            Search.from_dict(search_data)
-            for search_data in bucket.values()
-        ]
+        return [Search.from_dict(search_data) for search_data in bucket.values()]
 
     def get(self, search_id: str, context: Context) -> Search | None:
         """
@@ -75,10 +72,7 @@ class SearchRepository:
         """
         namespace = self._get_namespace(context)
         bucket = self._storage.get(namespace, {})
-        return {
-            search_id: dict(search_data)
-            for search_id, search_data in bucket.items()
-        }
+        return {search_id: dict(search_data) for search_id, search_data in bucket.items()}
 
     def import_context_data(
         self,
@@ -90,10 +84,9 @@ class SearchRepository:
         """
         namespace = self._get_namespace(context)
         self._storage[namespace] = {
-            str(search_id): dict(search_data)
-            for search_id, search_data in data.items()
+            str(search_id): dict(search_data) for search_id, search_data in data.items()
         }
-        
+
     @staticmethod
     def _get_namespace(context: Context) -> str:
         """Leitet den internen Speicher-Namespace aus dem Context ab."""

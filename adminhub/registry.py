@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Union
 
 import discord
 
-
-PanelPermissionCheck = Callable[[discord.Interaction], Union[bool, Awaitable[bool]]]
-PanelEmbedBuilder = Callable[[discord.Interaction], Union[discord.Embed, Awaitable[discord.Embed]]]
+PanelPermissionCheck = Callable[[discord.Interaction], bool | Awaitable[bool]]
+PanelEmbedBuilder = Callable[[discord.Interaction], discord.Embed | Awaitable[discord.Embed]]
 PanelActionCallback = Callable[[discord.Interaction], Awaitable[None]]
 
 

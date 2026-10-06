@@ -93,7 +93,9 @@ class AdminHubButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction) -> None:
         panel = self.cog.registry.get(self.panel.key)
         if panel is None:
-            await interaction.response.send_message("Dieses Modul ist nicht mehr verfügbar.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieses Modul ist nicht mehr verfügbar.", ephemeral=True
+            )
             return
         await interaction.response.edit_message(
             embed=await _build_panel_embed(panel, interaction),

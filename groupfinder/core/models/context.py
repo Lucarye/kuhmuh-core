@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable, Tuple
 
 
 @dataclass(slots=True, frozen=True)
@@ -17,13 +17,13 @@ class Context:
     context_key: str
     guild_id: int
 
-    command_channel_ids: Tuple[int, ...] = field(default_factory=tuple)
-    command_category_ids: Tuple[int, ...] = field(default_factory=tuple)
+    command_channel_ids: tuple[int, ...] = field(default_factory=tuple)
+    command_category_ids: tuple[int, ...] = field(default_factory=tuple)
 
     dashboard_channel_id: int | None = None
     log_channel_id: int | None = None
 
-    allowed_role_ids: Tuple[int, ...] = field(default_factory=tuple)
+    allowed_role_ids: tuple[int, ...] = field(default_factory=tuple)
     storage_namespace: str = "default"
 
     def is_live(self) -> bool:
@@ -42,13 +42,7 @@ class Context:
         """
         Prüft, ob ein Channel oder dessen Parent-Kategorie für diesen Context erlaubt ist.
         """
-        if channel_id in self.command_channel_ids:
-            return True
-
-        if category_id is not None and category_id in self.command_category_ids:
-            return True
-
-        return False
+        return channel_id in self.command_channel_ids or category_id in self.command_category_ids
 
     def has_allowed_role(self, role_ids: Iterable[int]) -> bool:
         """

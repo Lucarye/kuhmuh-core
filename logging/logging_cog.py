@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import re
 
 import discord
 from redbot.core import Config, app_commands, commands
-
 
 GUILD_ID = 1198649628787212458
 OWNER_ID = 359447597427064833
@@ -58,7 +58,9 @@ def _category_label(value: str) -> str:
 
 def _timestamp(value: dt.datetime | None = None) -> str:
     value = value or discord.utils.utcnow()
-    return f"{discord.utils.format_dt(value, style='F')} ({discord.utils.format_dt(value, style='R')})"
+    return (
+        f"{discord.utils.format_dt(value, style='F')} ({discord.utils.format_dt(value, style='R')})"
+    )
 
 
 def _user_lines(user: discord.abc.User) -> str:
@@ -103,8 +105,7 @@ def _deleted_message_content(message: discord.Message | None) -> str:
         for field in message_embed.fields:
             embed_parts.append(f"{field.name}: {field.value}")
         content_parts.append(
-            f"Embed {embed_index}: "
-            + " | ".join(embed_parts or ["ohne Textinhalt"])
+            f"Embed {embed_index}: " + " | ".join(embed_parts or ["ohne Textinhalt"])
         )
 
     return "\n".join(content_parts)[:1020] or "(leer)"
@@ -241,7 +242,10 @@ class LoggingCog(commands.Cog):
                 )
                 return
             await self.config.guild(interaction.guild).channels.set(
-                {**await self.config.guild(interaction.guild).channels(), category.value: channel.id}
+                {
+                    **await self.config.guild(interaction.guild).channels(),
+                    category.value: channel.id,
+                }
             )
             await interaction.response.send_message(
                 f"{_category_label(category.value)} wird jetzt nach {channel.mention} geloggt.",
@@ -303,10 +307,8 @@ class LoggingCog(commands.Cog):
             if user_id not in members:
                 member = guild.get_member(user_id)
                 if member is None:
-                    try:
+                    with contextlib.suppress(discord.HTTPException):
                         member = await guild.fetch_member(user_id)
-                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                        pass
                 members[user_id] = member
             return members[user_id]
 
@@ -421,8 +423,12 @@ class LoggingCog(commands.Cog):
         if cached_message is not None and cached_message.author is not None:
             embed.add_field(name="Autor", value=_user_lines(cached_message.author), inline=True)
         else:
-            embed.add_field(name="Autor", value="nicht verfügbar (Nachricht nicht im Cache)", inline=True)
-        embed.add_field(name="Channel", value=f"<#${payload.channel_id}>".replace("$", ""), inline=True)
+            embed.add_field(
+                name="Autor", value="nicht verfügbar (Nachricht nicht im Cache)", inline=True
+            )
+        embed.add_field(
+            name="Channel", value=f"<#${payload.channel_id}>".replace("$", ""), inline=True
+        )
         embed.add_field(
             name="Ursprünglicher Inhalt",
             value=_deleted_message_content(cached_message),
@@ -460,8 +466,7 @@ class LoggingCog(commands.Cog):
         )
         if message.attachments:
             attachments = "\n".join(
-                f"`{attachment.filename}` ({attachment.url})"
-                for attachment in message.attachments
+                f"`{attachment.filename}` ({attachment.url})" for attachment in message.attachments
             )
             embed.add_field(name="Anhänge", value=attachments[:1020], inline=False)
         embed.add_field(name="Nachricht", value=f"`{message.id}`", inline=True)
@@ -490,10 +495,8 @@ class LoggingCog(commands.Cog):
             return
         user = payload.member or self.bot.get_user(payload.user_id)
         message = None
-        try:
+        with contextlib.suppress(discord.HTTPException):
             message = await channel.fetch_message(payload.message_id)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            pass
         if user is None:
             user_text = f"<@{payload.user_id}>\nUnbekannter Nutzer · {payload.user_id}"
         else:
@@ -502,14 +505,18 @@ class LoggingCog(commands.Cog):
         embed.add_field(name="Nutzer", value=user_text, inline=True)
         embed.add_field(name="Emoji", value=str(payload.emoji), inline=True)
         embed.add_field(name="Channel", value=channel.mention, inline=True)
-        message_url = f"https://discord.com/channels/{GUILD_ID}/{payload.channel_id}/{payload.message_id}"
+        message_url = (
+            f"https://discord.com/channels/{GUILD_ID}/{payload.channel_id}/{payload.message_id}"
+        )
         embed.add_field(
             name="Nachricht",
             value=f"`{payload.message_id}`\n[Zur Nachricht]({message.jump_url if message else message_url})",
             inline=False,
         )
         if message is not None:
-            embed.add_field(name="Nachrichtenautor", value=_user_lines(message.author), inline=False)
+            embed.add_field(
+                name="Nachrichtenautor", value=_user_lines(message.author), inline=False
+            )
         embed.add_field(name="Zeit", value=_timestamp(), inline=False)
         await self.send_log(guild, "message", embed)
 
@@ -547,7 +554,9 @@ class LoggingCog(commands.Cog):
         before_roles = {role.id: role for role in before.roles}
         after_roles = {role.id: role for role in after.roles}
         added_roles = [after_roles[role_id] for role_id in after_roles.keys() - before_roles.keys()]
-        removed_roles = [before_roles[role_id] for role_id in before_roles.keys() - after_roles.keys()]
+        removed_roles = [
+            before_roles[role_id] for role_id in before_roles.keys() - after_roles.keys()
+        ]
         for role, title in [(role, "Rolle hinzugefügt") for role in added_roles] + [
             (role, "Rolle entfernt") for role in removed_roles
         ]:
@@ -576,9 +585,13 @@ class LoggingCog(commands.Cog):
             title = "Server-Boost gestartet" if after.premium_since else "Server-Boost beendet"
             embed = _embed("member", title)
             embed.add_field(name="Nutzer", value=_user_lines(after), inline=False)
-            embed.add_field(name="Boosts", value=str(after.guild.premium_subscription_count or 0), inline=True)
+            embed.add_field(
+                name="Boosts", value=str(after.guild.premium_subscription_count or 0), inline=True
+            )
             if after.guild.premium_tier:
-                embed.add_field(name="Boost-Level", value=str(after.guild.premium_tier), inline=True)
+                embed.add_field(
+                    name="Boost-Level", value=str(after.guild.premium_tier), inline=True
+                )
             embed.add_field(name="Zeit", value=_timestamp(), inline=False)
             await self.send_log(after.guild, "member", embed)
 
@@ -651,7 +664,9 @@ class LoggingCog(commands.Cog):
         if invite.max_uses:
             embed.add_field(name="Maximale Nutzungen", value=str(invite.max_uses), inline=True)
         if invite.max_age:
-            embed.add_field(name="Gültigkeit", value=f"{invite.max_age // 3600} Stunden", inline=True)
+            embed.add_field(
+                name="Gültigkeit", value=f"{invite.max_age // 3600} Stunden", inline=True
+            )
         embed.add_field(name="Zeit", value=_timestamp(), inline=False)
         await self.send_log(invite.guild, "server", embed)
 
@@ -693,9 +708,13 @@ class LoggingCog(commands.Cog):
         if before.position != after.position:
             changes.append(("Position", str(before.position), str(after.position)))
         if before.mentionable != after.mentionable:
-            changes.append(("Erwähnbar", _bool_state(before.mentionable), _bool_state(after.mentionable)))
+            changes.append(
+                ("Erwähnbar", _bool_state(before.mentionable), _bool_state(after.mentionable))
+            )
         if before.hoist != after.hoist:
-            changes.append(("Separat anzeigen", _bool_state(before.hoist), _bool_state(after.hoist)))
+            changes.append(
+                ("Separat anzeigen", _bool_state(before.hoist), _bool_state(after.hoist))
+            )
         if before.permissions != after.permissions:
             changes.extend(self._permission_changes(before.permissions, after.permissions))
         if not changes:
@@ -722,11 +741,15 @@ class LoggingCog(commands.Cog):
         if invite.channel is not None:
             embed.add_field(name="Channel", value=invite.channel.mention, inline=True)
         if invite.inviter is not None:
-            embed.add_field(name="Ursprünglicher Ersteller", value=_user_lines(invite.inviter), inline=False)
+            embed.add_field(
+                name="Ursprünglicher Ersteller", value=_user_lines(invite.inviter), inline=False
+            )
         if invite.max_uses:
             embed.add_field(name="Nutzungslimit", value=str(invite.max_uses), inline=True)
         if invite.max_age:
-            embed.add_field(name="Ablaufzeit", value=f"{invite.max_age // 3600} Stunden", inline=True)
+            embed.add_field(
+                name="Ablaufzeit", value=f"{invite.max_age // 3600} Stunden", inline=True
+            )
         embed.add_field(name="Zeit", value=_timestamp(), inline=False)
         await self.send_log(invite.guild, "server", embed)
 
@@ -750,11 +773,19 @@ class LoggingCog(commands.Cog):
         before_category = getattr(before.category, "name", None)
         after_category = getattr(after.category, "name", None)
         if before_category != after_category:
-            channel_changes.append(("Kategorie", before_category or "keine", after_category or "keine"))
+            channel_changes.append(
+                ("Kategorie", before_category or "keine", after_category or "keine")
+            )
         if getattr(before, "topic", None) != getattr(after, "topic", None):
             channel_changes.append(("Thema", before.topic or "leer", after.topic or "leer"))
         if getattr(before, "slowmode_delay", 0) != getattr(after, "slowmode_delay", 0):
-            channel_changes.append(("Slowmode", f"{before.slowmode_delay} Sekunden", f"{after.slowmode_delay} Sekunden"))
+            channel_changes.append(
+                (
+                    "Slowmode",
+                    f"{before.slowmode_delay} Sekunden",
+                    f"{after.slowmode_delay} Sekunden",
+                )
+            )
         if getattr(before, "nsfw", False) != getattr(after, "nsfw", False):
             channel_changes.append(("NSFW", _bool_state(before.nsfw), _bool_state(after.nsfw)))
         if channel_changes:
@@ -762,10 +793,14 @@ class LoggingCog(commands.Cog):
             embed.add_field(name="Channel", value=after.mention, inline=False)
             embed.add_field(
                 name="Änderungen",
-                value="\n".join(f"{label}: {old} → {new}" for label, old, new in channel_changes)[:1020],
+                value="\n".join(f"{label}: {old} → {new}" for label, old, new in channel_changes)[
+                    :1020
+                ],
                 inline=False,
             )
-            actor = await self._audit_actor(after.guild, discord.AuditLogAction.channel_update, after.id)
+            actor = await self._audit_actor(
+                after.guild, discord.AuditLogAction.channel_update, after.id
+            )
             if actor is not None:
                 embed.add_field(name="Geändert von", value=_user_lines(actor), inline=True)
             embed.add_field(name="Zeit", value=_timestamp(), inline=True)
@@ -788,7 +823,9 @@ class LoggingCog(commands.Cog):
                 value=f"{label}: {old_state} → {new_state}",
                 inline=False,
             )
-            actor = await self._audit_actor(after.guild, discord.AuditLogAction.channel_update, after.id)
+            actor = await self._audit_actor(
+                after.guild, discord.AuditLogAction.channel_update, after.id
+            )
             if actor is not None:
                 embed.add_field(name="Geändert von", value=_user_lines(actor), inline=True)
             embed.add_field(name="Zeit", value=_timestamp(), inline=False)
@@ -850,7 +887,9 @@ class LoggingCog(commands.Cog):
         embed.add_field(name="Account erstellt", value=_timestamp(member.created_at), inline=True)
         embed.add_field(name="Account-Alter", value=_account_age(member.created_at), inline=True)
         embed.add_field(name="Server beigetreten", value=_timestamp(member.joined_at), inline=True)
-        embed.add_field(name="Mitglieder", value=str(member.guild.member_count or "unbekannt"), inline=True)
+        embed.add_field(
+            name="Mitglieder", value=str(member.guild.member_count or "unbekannt"), inline=True
+        )
         avatar = getattr(member, "display_avatar", None)
         if avatar:
             embed.set_thumbnail(url=avatar.url)
@@ -865,8 +904,14 @@ class LoggingCog(commands.Cog):
         embed.add_field(name="Letzter Nutzer", value=_user_lines(member), inline=False)
         embed.add_field(name="Server beigetreten", value=_timestamp(member.joined_at), inline=True)
         embed.add_field(name="Server verlassen", value=_timestamp(left_at), inline=True)
-        embed.add_field(name="Letzte Rollen", value=" ".join(role.mention for role in member.roles[1:]) or "keine", inline=False)
-        embed.add_field(name="Mitglieder", value=str(max((member.guild.member_count or 1) - 1, 0)), inline=True)
+        embed.add_field(
+            name="Letzte Rollen",
+            value=" ".join(role.mention for role in member.roles[1:]) or "keine",
+            inline=False,
+        )
+        embed.add_field(
+            name="Mitglieder", value=str(max((member.guild.member_count or 1) - 1, 0)), inline=True
+        )
         avatar = getattr(member, "display_avatar", None)
         if avatar:
             embed.set_thumbnail(url=avatar.url)
@@ -938,7 +983,11 @@ class LoggingCog(commands.Cog):
         embed = _embed("message", "Nachricht bearbeitet", "Eine visuelle Beispielausgabe.")
         embed.add_field(name="Nutzer", value=_user_lines(interaction.user), inline=True)
         embed.add_field(name="Channel", value=_channel_mention(interaction.channel), inline=True)
-        embed.add_field(name="Nachricht", value="`987654321012345678`\n[Zur Nachricht](https://discord.com/channels/1198649628787212458/1199322485297000528/987654321012345678)", inline=False)
+        embed.add_field(
+            name="Nachricht",
+            value="`987654321012345678`\n[Zur Nachricht](https://discord.com/channels/1198649628787212458/1199322485297000528/987654321012345678)",
+            inline=False,
+        )
         embed.add_field(name="Vorher", value="Suche startet um 19:00", inline=True)
         embed.add_field(name="Nachher", value="Suche startet um 19:30", inline=True)
         embed.add_field(name="Zeit", value=_timestamp(), inline=False)
@@ -948,7 +997,9 @@ class LoggingCog(commands.Cog):
         embed = _embed("member", "Rolle hinzugefügt")
         role = self._test_role(interaction.guild)
         embed.add_field(name="Mitglied", value=_user_lines(interaction.user), inline=False)
-        embed.add_field(name="Rolle", value=role.mention if role else f"<@&{TEST_ROLE_ID}>", inline=True)
+        embed.add_field(
+            name="Rolle", value=role.mention if role else f"<@&{TEST_ROLE_ID}>", inline=True
+        )
         embed.add_field(name="Ausgeführt von", value=_user_lines(interaction.user), inline=True)
         embed.add_field(name="Zeit", value=_timestamp(), inline=False)
         return embed
@@ -957,11 +1008,17 @@ class LoggingCog(commands.Cog):
         embed = _embed("server", "Channel-Rechte geändert")
         embed.add_field(name="Channel", value=_channel_mention(interaction.channel), inline=True)
         embed.add_field(name="Ziel", value=f"<@&{TEST_ROLE_ID}>", inline=True)
-        embed.add_field(name="Geänderte Permissions", value=_changed_permissions([
-            ("Nachrichten senden", "✅", "❌"),
-            ("Dateien anhängen", "➖", "✅"),
-            ("Reaktionen hinzufügen", "❌", "➖"),
-        ]), inline=False)
+        embed.add_field(
+            name="Geänderte Permissions",
+            value=_changed_permissions(
+                [
+                    ("Nachrichten senden", "✅", "❌"),
+                    ("Dateien anhängen", "➖", "✅"),
+                    ("Reaktionen hinzufügen", "❌", "➖"),
+                ]
+            ),
+            inline=False,
+        )
         embed.add_field(name="Ausgeführt von", value=_user_lines(interaction.user), inline=True)
         embed.add_field(name="Zeit", value=_timestamp(), inline=True)
         return embed
@@ -989,7 +1046,9 @@ class LoggingCog(commands.Cog):
         join.add_field(name="Server beigetreten", value=_timestamp(joined), inline=True)
         join.add_field(name="Account-Alter", value="420 Tage", inline=True)
         join.add_field(name="Mitglieder", value="1.234", inline=True)
-        join.add_field(name="Invite", value="`kuhmuh-test`\nErsteller: @Einladender Nutzer", inline=True)
+        join.add_field(
+            name="Invite", value="`kuhmuh-test`\nErsteller: @Einladender Nutzer", inline=True
+        )
         avatar = getattr(interaction.user, "display_avatar", None)
         if avatar:
             join.set_thumbnail(url=avatar.url)
@@ -1000,7 +1059,9 @@ class LoggingCog(commands.Cog):
             "Beispiel fuer den spaeteren Leave-Log.",
             event="leave",
         )
-        leave.add_field(name="Letzter Nutzername", value=_user_lines(interaction.user), inline=False)
+        leave.add_field(
+            name="Letzter Nutzername", value=_user_lines(interaction.user), inline=False
+        )
         leave.add_field(name="Beigetreten", value=_timestamp(joined), inline=True)
         leave.add_field(name="Verlassen", value=_timestamp(now), inline=True)
         leave.add_field(name="Mitgliedsdauer", value="37 Tage, 4 Stunden", inline=True)

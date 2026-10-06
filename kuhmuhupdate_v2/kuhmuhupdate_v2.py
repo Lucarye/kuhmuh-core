@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import discord
-from discord import app_commands
 from redbot.core import commands
 
 from adminhub.registry import AdminAction, AdminCommandInfo, AdminPanel
-from .service import KuhmuhUpdateService
 
+from .service import KuhmuhUpdateService
 
 GUILD_ID = 1198649628787212458
 OWNER_ID = 359447597427064833
@@ -18,7 +17,7 @@ class AddCogModal(discord.ui.Modal, title="Cog speichern"):
     cog_name = discord.ui.TextInput(label="Cog-Name", max_length=100)
     repo_name = discord.ui.TextInput(label="Repository-Name", max_length=100)
 
-    def __init__(self, cog: "KuhmuhUpdateV2") -> None:
+    def __init__(self, cog: KuhmuhUpdateV2) -> None:
         super().__init__()
         self.cog = cog
 
@@ -31,7 +30,7 @@ class AddCogModal(discord.ui.Modal, title="Cog speichern"):
 
 
 class StoredCogSelect(discord.ui.Select):
-    def __init__(self, cog: "KuhmuhUpdateV2", operation: str) -> None:
+    def __init__(self, cog: KuhmuhUpdateV2, operation: str) -> None:
         self.cog = cog
         self.operation = operation
         options = [
@@ -43,7 +42,8 @@ class StoredCogSelect(discord.ui.Select):
         ][:25]
         super().__init__(
             placeholder="Gespeicherten Cog auswählen …",
-            options=options or [discord.SelectOption(label="Keine Cogs gespeichert", value="__none__")],
+            options=options
+            or [discord.SelectOption(label="Keine Cogs gespeichert", value="__none__")],
             disabled=not options,
             min_values=1,
             max_values=1,
@@ -53,7 +53,9 @@ class StoredCogSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction) -> None:
         key = self.values[0]
         if key == "__none__":
-            await interaction.response.send_message("Keine gespeicherten Cogs vorhanden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Keine gespeicherten Cogs vorhanden.", ephemeral=True
+            )
             return
 
         if self.operation == "run":
@@ -68,7 +70,7 @@ class StoredCogSelect(discord.ui.Select):
 
 
 class StoredCogSelectView(discord.ui.View):
-    def __init__(self, cog: "KuhmuhUpdateV2", operation: str) -> None:
+    def __init__(self, cog: KuhmuhUpdateV2, operation: str) -> None:
         super().__init__(timeout=180)
         self.add_item(StoredCogSelect(cog, operation))
 
@@ -102,7 +104,9 @@ class KuhmuhUpdateV2(commands.Cog):
             color=discord.Color.orange(),
         )
         if not self.stored_cogs_cache:
-            embed.add_field(name="Gespeicherte Cogs", value="Keine Einträge vorhanden.", inline=False)
+            embed.add_field(
+                name="Gespeicherte Cogs", value="Keine Einträge vorhanden.", inline=False
+            )
         else:
             lines = [
                 f"• **{value['cog_name']}** → `{value['repo_name']}`"
@@ -140,7 +144,9 @@ class KuhmuhUpdateV2(commands.Cog):
 
     async def refresh_panel(self, interaction: discord.Interaction) -> None:
         if self.admin_hub is None:
-            await interaction.response.send_message("Admin-Hub ist nicht verfügbar.", ephemeral=True)
+            await interaction.response.send_message(
+                "Admin-Hub ist nicht verfügbar.", ephemeral=True
+            )
             return
         await interaction.response.edit_message(
             embed=await self.build_embed(interaction),

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from ..utils.datetime_utils import datetime_to_storage, datetime_from_storage
 from typing import Any
+
+from ..utils.datetime_utils import datetime_from_storage, datetime_to_storage, utc_now
 
 
 @dataclass(slots=True)
@@ -18,7 +19,7 @@ class Participant:
 
     user_id: int
     display_name: str
-    joined_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    joined_at: datetime = field(default_factory=utc_now)
     extra_data: dict[str, Any] = field(default_factory=dict)
 
     def update_display_name(self, display_name: str) -> None:
@@ -39,7 +40,7 @@ class Participant:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Participant":
+    def from_dict(cls, data: dict[str, Any]) -> Participant:
         """
         Deserialisiert einen Teilnehmer aus einer Storage-Struktur.
 
@@ -51,4 +52,3 @@ class Participant:
             joined_at=datetime_from_storage(data.get("joined_at")),
             extra_data=dict(data.get("extra_data", {})),
         )
-

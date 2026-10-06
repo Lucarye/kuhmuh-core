@@ -17,11 +17,11 @@ class ValidationResult:
     normalized_payload: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def ok(cls, normalized_payload: dict[str, Any]) -> "ValidationResult":
+    def ok(cls, normalized_payload: dict[str, Any]) -> ValidationResult:
         return cls(valid=True, errors=[], normalized_payload=normalized_payload)
 
     @classmethod
-    def fail(cls, *errors: str) -> "ValidationResult":
+    def fail(cls, *errors: str) -> ValidationResult:
         return cls(valid=False, errors=list(errors), normalized_payload={})
 
 
@@ -63,9 +63,7 @@ class BaseValidator:
                     continue
 
                 if value not in field_definition.choices:
-                    errors.append(
-                        f"Ungültige Auswahl für {field_definition.label}: {value}"
-                    )
+                    errors.append(f"Ungültige Auswahl für {field_definition.label}: {value}")
                     continue
 
             elif field_definition.field_type == "string":
@@ -94,7 +92,4 @@ class BaseValidator:
         if value is None:
             return True
 
-        if isinstance(value, str) and not value.strip():
-            return True
-
-        return False
+        return isinstance(value, str) and not value.strip()

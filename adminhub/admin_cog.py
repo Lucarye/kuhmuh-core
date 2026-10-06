@@ -22,6 +22,7 @@ DEFAULT_GUILD = {
     "panel_message_id": None,
 }
 
+
 class AdminHubCog(commands.Cog):
     """
     Zentraler Einstiegspunkt fuer administrative Kuhmuh-Module (V2).
@@ -95,7 +96,9 @@ class AdminHubCog(commands.Cog):
     # Slash Command
     # -------------------------
     @app_commands.guilds(discord.Object(id=GUILD_ID))
-    @app_commands.command(name="admin", description="Postet das Kuhmuh Admin-Panel in diesen Kanal.")
+    @app_commands.command(
+        name="admin", description="Postet das Kuhmuh Admin-Panel in diesen Kanal."
+    )
     async def admin_command(
         self,
         interaction: discord.Interaction,
@@ -107,7 +110,9 @@ class AdminHubCog(commands.Cog):
             )
             return
 
-        if not isinstance(interaction.user, discord.Member) or not self.is_authorized(interaction.user):
+        if not isinstance(interaction.user, discord.Member) or not self.is_authorized(
+            interaction.user
+        ):
             await interaction.response.send_message(
                 "Dafuer fehlen dir die erforderlichen Berechtigungen.",
                 ephemeral=True,

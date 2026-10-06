@@ -38,7 +38,7 @@ class OperationResult:
         dispatch_required: bool = False,
         search: Search | None = None,
         extra: dict[str, Any] | None = None,
-    ) -> "OperationResult":
+    ) -> OperationResult:
         """Erzeugt ein erfolgreiches OperationResult."""
         return cls(
             success=True,
@@ -59,7 +59,7 @@ class OperationResult:
         error_code: str | None = None,
         search: Search | None = None,
         extra: dict[str, Any] | None = None,
-    ) -> "OperationResult":
+    ) -> OperationResult:
         """Erzeugt ein fehlgeschlagenes OperationResult."""
         return cls(
             success=False,

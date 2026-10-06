@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable
 
 import discord
 
-
 ConfirmCallback = Callable[[discord.Interaction], Awaitable[None]]
 
 
