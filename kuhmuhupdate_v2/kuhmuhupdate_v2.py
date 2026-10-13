@@ -3,7 +3,7 @@ from __future__ import annotations
 import discord
 from redbot.core import commands
 
-from adminhub.registry import AdminAction, AdminCommandInfo, AdminPanel
+from kuhmuh_adminhub.registry import AdminAction, AdminCommandInfo, AdminPanel
 
 from .service import KuhmuhUpdateService
 

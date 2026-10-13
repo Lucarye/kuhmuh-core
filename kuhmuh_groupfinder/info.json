@@ -1,5 +1,5 @@
 {
-    "name": "groupfinder",
+    "name": "kuhmuh_groupfinder",
     "short": "Modulares Gruppensuche-System für Kuhmuh Core.",
     "description": "Groupfinder ist das erste Modul innerhalb von Kuhmuh Core. Es bildet ein sauberes, modular aufgebautes Gruppensuche-System mit Trennung zwischen Command, Core, Modulen und UI.",
     "end_user_data_statement": "Dieses Cog speichert gruppensuchbezogene Daten zur technischen Funktion des Systems.",
@@ -11,7 +11,7 @@
     "requirements": [],
     "tags": [
         "community",
-        "groupfinder",
+        "kuhmuh_groupfinder",
         "koordination",
         "kuhmuh"
     ],

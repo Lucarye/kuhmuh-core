@@ -47,3 +47,15 @@ Der gemeinsame Verlauf vor der Repo-Trennung steht weiterhin im Archiv unter [`.
 - Keine Command-, Logformat- oder Datenformatänderung.
 - Validierung: `uv run ruff check` und `ruff format --check` ohne Befund; `uv run pyrefly check` 32 → 20 Fehler (alle 12 betroffenen behoben).
 - Restunsicherheit: Kein Laufzeittest der Event-Listener; Gleichheit der Ausgabe per Inhaltsprüfung (`mention` ist bei Guild-Channels `<#id>`).
+
+## 13.10.2026, 18:37:30 +02:00
+
+- AKTIV: Cog-Pakete mit Präfix `kuhmuh_` umbenannt, Code inhaltlich unverändert:
+  - `adminhub/` → `kuhmuh_adminhub/`
+  - `groupfinder/` → `kuhmuh_groupfinder/`
+  - `logging/` → `kuhmuh_logging/` (Paketname verdeckte das stdlib-Modul `logging`)
+  - `info.json`: `name` jeweils auf den neuen Paketnamen gesetzt; in `kuhmuh_groupfinder/info.json` zusätzlich das Tag `groupfinder` → `kuhmuh_groupfinder`.
+- AKTIV: `kuhmuhupdate_v2/kuhmuhupdate_v2.py`: Import `adminhub.registry` → `kuhmuh_adminhub.registry`. Ohne Anpassung wäre `kuhmuhupdate_v2` nach der Umbenennung nicht mehr ladbar.
+- Kompatibilität: Cog-Klassen, Command-Namen und `Config.get_conf`-Identifier unverändert (Red speichert unter Klassenname + Identifier), gespeicherte Daten bleiben erreichbar. `get_cog("AdminHubCog")` greift weiterhin über den Klassennamen.
+- Validierung: Grep findet keine Importe der alten Paketnamen mehr; `uv run ruff check --no-cache kuhmuh_adminhub kuhmuh_groupfinder kuhmuh_logging kuhmuhupdate_v2` ohne Befund; `uv run pyrefly check` 17 Fehler, keiner davon durch die Umbenennung (die vier `missing-import` in `kuhmuh_groupfinder/core/routing/search_service.py` bestehen seit 06.10.2026, 18:29:00).
+- Offen: Red-Ladezustand. Alte Cogs (`logging`, `adminhub`, `groupfinder`) entladen und deinstallieren, neue Paketnamen installieren und laden. Danach prüfen, ob Command-IDs unverändert bleiben; Sync nur bei Bedarf manuell per `[p]slash sync <GUILD_ID>`. Einträge mit alten Namen in der `kuhmuhupdate_v2`-Cogliste manuell anpassen.

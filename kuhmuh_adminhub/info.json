@@ -1,5 +1,5 @@
 {
-    "name": "adminhub",
+    "name": "kuhmuh_adminhub",
     "short": "Zentraler Admin-Hub fuer Kuhmuh V2.",
     "description": "Buendelt administrative Kuhmuh-Module hinter einem einzelnen Einstiegspunkt (/admin) mit dauerhaftem Panel. Enthaelt noch keine migrierten Module.",
     "end_user_data_statement": "Speichert pro Guild lediglich Channel- und Nachrichten-ID des Admin-Panels.",
