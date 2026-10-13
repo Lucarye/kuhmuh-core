@@ -55,7 +55,7 @@ class AdminHubCog(commands.Cog):
             return None
         return AdminPanelView(self, panel)
 
-    def cog_unload(self) -> None:
+    async def cog_unload(self) -> None:
         if self._startup_task and not self._startup_task.done():
             self._startup_task.cancel()
 

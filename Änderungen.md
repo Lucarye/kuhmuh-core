@@ -59,3 +59,8 @@ Der gemeinsame Verlauf vor der Repo-Trennung steht weiterhin im Archiv unter [`.
 - Kompatibilität: Cog-Klassen, Command-Namen und `Config.get_conf`-Identifier unverändert (Red speichert unter Klassenname + Identifier), gespeicherte Daten bleiben erreichbar. `get_cog("AdminHubCog")` greift weiterhin über den Klassennamen.
 - Validierung: Grep findet keine Importe der alten Paketnamen mehr; `uv run ruff check --no-cache kuhmuh_adminhub kuhmuh_groupfinder kuhmuh_logging kuhmuhupdate_v2` ohne Befund; `uv run pyrefly check` 17 Fehler, keiner davon durch die Umbenennung (die vier `missing-import` in `kuhmuh_groupfinder/core/routing/search_service.py` bestehen seit 06.10.2026, 18:29:00).
 - Offen: Red-Ladezustand. Alte Cogs (`logging`, `adminhub`, `groupfinder`) entladen und deinstallieren, neue Paketnamen installieren und laden. Danach prüfen, ob Command-IDs unverändert bleiben; Sync nur bei Bedarf manuell per `[p]slash sync <GUILD_ID>`. Einträge mit alten Namen in der `kuhmuhupdate_v2`-Cogliste manuell anpassen.
+
+## 13.10.2026, 18:40:28 +02:00
+
+- AKTIV: `kuhmuh_adminhub/admin_cog.py`: `cog_unload` von `def` auf `async def` umgestellt. discord.py deklariert `Cog.cog_unload` als `async def`; die synchrone Überschreibung war zur Laufzeit zulässig (Aufruf über `maybe_coroutine`), verletzte aber die Signatur der Basisklasse. Verhalten unverändert (Abbruch des Startup-Tasks).
+- Validierung: `uv run ruff check` und `ruff format --check` ohne Befund; `uv run pyrefly check` 17 → 16 Fehler (Override-Fehler `bad-override` behoben); Aufrufpfad in `discord/ext/commands/cog.py` (Z. 727, 780) per Inhaltsprüfung bestätigt.
